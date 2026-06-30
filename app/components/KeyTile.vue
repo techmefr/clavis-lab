@@ -14,9 +14,10 @@ defineEmits<{
     click: [id: string]
 }>()
 
-function fingerVar(finger: string): string {
-    return `var(--f-${finger || 'th'})`
-}
+const UNIT = 64
+const GAP  = 6
+
+function fingerVar(finger: string): string { return `var(--f-${finger || 'th'})` }
 
 function mainSizeClass(s: string | null | undefined): string {
     if (s == null) return ''
@@ -26,17 +27,27 @@ function mainSizeClass(s: string | null | undefined): string {
     return 'tiny'
 }
 
-const encDef = computed(() => props.pos.kind === 'encoder' ? (props.def as IEncoderDef | null) : null)
-const keyDef = computed(() => props.pos.kind !== 'encoder' ? (props.def as IKeyDef | null) : null)
+const encDef = computed(() => (props.pos.kind === 'encoder' || props.pos.kind === 'trackball') ? (props.def as IEncoderDef | null) : null)
+const keyDef = computed(() => (props.pos.kind !== 'encoder' && props.pos.kind !== 'trackball') ? (props.def as IKeyDef | null) : null)
 const isTrans = computed(() => !keyDef.value || keyDef.value.type === 'trans')
 const ghost = computed(() => isTrans.value && !!props.base?.main && props.base.type !== 'trans')
+
+const keyW = computed(() => (props.pos.w ?? 1) * UNIT - GAP)
+const keyH = computed(() => (props.pos.h ?? 1) * UNIT - GAP)
+
+const basePos = computed(() => ({
+    left: props.pos.x * UNIT + 'px',
+    top:  props.pos.y * UNIT + 'px',
+}))
 </script>
 
 <template>
+<!-- Encoder -->
 <div
     v-if="pos.kind === 'encoder'"
     class="key encoder"
-    :style="{ left: pos.x * 64 + 'px', top: pos.y * 64 + 'px' }"
+    :class="selected ? 'selected' : ''"
+    :style="basePos"
     title="Encodeur"
     @click="$emit('click', pos.id)"
 >
@@ -46,6 +57,21 @@ const ghost = computed(() => isTrans.value && !!props.base?.main && props.base.t
     <span class="enc-cw">{{ encDef?.cw ?? '↓' }}</span>
 </div>
 
+<!-- Trackball -->
+<div
+    v-else-if="pos.kind === 'trackball'"
+    class="key trackball"
+    :class="selected ? 'selected' : ''"
+    :style="{ ...basePos, width: keyW + 'px', height: keyW + 'px', '--fc': fingerVar(pos.finger) }"
+    @click="$emit('click', pos.id)"
+>
+    <div class="tb-ring" />
+    <div class="tb-ball">
+        <span class="tb-label mono">{{ encDef?.press ?? '●' }}</span>
+    </div>
+</div>
+
+<!-- Standard key -->
 <div
     v-else
     :class="[
@@ -56,8 +82,9 @@ const ghost = computed(() => isTrans.value && !!props.base?.main && props.base.t
         isTrigger ? 'is-trigger' : '',
     ]"
     :style="{
-        left: pos.x * 64 + 'px',
-        top: pos.y * 64 + 'px',
+        ...basePos,
+        width:  (pos.w && pos.w !== 1) ? keyW + 'px' : undefined,
+        height: (pos.h && pos.h !== 1) ? keyH + 'px' : undefined,
         transform: pos.rot ? `rotate(${pos.rot}deg)` : undefined,
         '--fc': fingerVar(pos.finger),
     }"

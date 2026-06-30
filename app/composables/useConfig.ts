@@ -68,6 +68,9 @@ const jsModes = ref<Record<string, number>>({ L: 0, R: 0 })
 const boardEditMode = ref(false)
 const boardSelKey = ref<string | null>(null)
 
+interface StampTool { kind: IKeyPos['kind']; w: number; h: number }
+const stampTool = ref<StampTool | null>(null)
+
 const t = computed<II18nStrings>(() => I18N[lang.value])
 const layout = computed<ILayout>(() => config.value.layouts.find(l => l.id === activeLayoutId.value) ?? config.value.layouts[0] as ILayout)
 const layers = computed<ILayer[]>(() => layout.value.layers)
@@ -286,8 +289,18 @@ function importConfig(file: File) {
     r.readAsText(file)
 }
 
-function enterBoardEdit() { boardEditMode.value = true; selKey.value = null; boardSelKey.value = null }
-function exitBoardEdit() { boardEditMode.value = false; boardSelKey.value = null }
+function enterBoardEdit() {
+    boardEditMode.value = true
+    selKey.value = null
+    boardSelKey.value = null
+    stampTool.value = { kind: 'matrix', w: 1, h: 1 }
+}
+function exitBoardEdit() {
+    boardEditMode.value = false
+    boardSelKey.value = null
+    stampTool.value = null
+}
+function setStamp(tool: StampTool | null) { stampTool.value = tool }
 
 function updateBoardDef(mut: (b: IBoard) => void) {
     const bid = layout.value.board
@@ -300,22 +313,43 @@ function updateBoardDef(mut: (b: IBoard) => void) {
 
 function recalcBoardSize(b: IBoard) {
     if (!b.keys.length) { b.widthPx = 512; b.heightPx = 320; return }
-    const maxX = Math.max(...b.keys.map(k => k.x)) + 1
-    const maxY = Math.max(...b.keys.map(k => k.y)) + 1
+    const maxX = Math.max(...b.keys.map(k => k.x + (k.w ?? 1)))
+    const maxY = Math.max(...b.keys.map(k => k.y + (k.h ?? 1)))
     b.widthPx = Math.max(512, maxX * 64 + 64)
     b.heightPx = Math.max(320, maxY * 64 + 64)
 }
 
-function addKeyToBoard(gridX: number, gridY: number) {
-    if (!isCustomBoard.value) return
-    if (board.value.keys.find(k => k.x === gridX && k.y === gridY)) return
-    const id = 'k' + Date.now()
+function setBoardKeySize(id: string, w: number, h: number) {
     updateBoardDef(b => {
-        b.keys.push({ id, x: gridX, y: gridY, kind: 'matrix', finger: 'ri', hand: 'r' })
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        k.w = w !== 1 ? w : undefined
+        k.h = h !== 1 ? h : undefined
+        recalcBoardSize(b)
+    })
+}
+
+function addKeyToBoard(gridX: number, gridY: number) {
+    if (!isCustomBoard.value || !stampTool.value) return
+    const stamp = stampTool.value
+    const occupied = board.value.keys.find(k => k.x === gridX && k.y === gridY)
+    if (occupied) return
+    const id = 'k' + Date.now()
+    const defaultFinger: Record<string, string> = { thumb: 'th', encoder: 'enc', trackball: 'th', joystick: 'th' }
+    updateBoardDef(b => {
+        b.keys.push({
+            id, x: gridX, y: gridY,
+            kind: stamp.kind,
+            finger: defaultFinger[stamp.kind] ?? 'ri',
+            hand: 'r',
+            w: stamp.w !== 1 ? stamp.w : undefined,
+            h: stamp.h !== 1 ? stamp.h : undefined,
+        })
         b.matrixIds = b.keys.filter(k => k.kind !== 'encoder').map(k => k.id)
         recalcBoardSize(b)
     })
     boardSelKey.value = id
+    selKey.value = id
 }
 
 function deleteBoardKey(id: string) {
@@ -383,14 +417,17 @@ export function useConfig() {
         boardEditMode,
         boardSelKey,
         isCustomBoard,
+        stampTool,
         enterBoardEdit,
         exitBoardEdit,
+        setStamp,
         addKeyToBoard,
         deleteBoardKey,
         moveBoardKey,
         rotateBoardKey,
         setBoardKeyFinger,
         setBoardKeyKind,
+        setBoardKeySize,
         activeLayoutId,
         activeLayerId,
         selKey,

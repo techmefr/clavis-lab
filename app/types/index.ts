@@ -17,7 +17,7 @@ export interface IEncoderDef {
 export interface IKeyPos {
     id: string
     hand: string
-    kind: 'matrix' | 'thumb' | 'encoder' | 'joystick' | 'modebtn'
+    kind: 'matrix' | 'thumb' | 'encoder' | 'joystick' | 'modebtn' | 'trackball'
     finger: string
     x: number
     y: number

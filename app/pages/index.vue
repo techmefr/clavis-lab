@@ -3,59 +3,28 @@ import { useConfig } from '~/composables/useConfig'
 import { useFit } from '~/composables/useFit'
 
 const {
-    config,
-    lang,
-    isDark,
-    boardEditMode,
-    boardSelKey,
-    isCustomBoard,
-    enterBoardEdit,
-    exitBoardEdit,
-    addKeyToBoard,
-    deleteBoardKey,
-    moveBoardKey,
-    rotateBoardKey,
-    setBoardKeyFinger,
-    setBoardKeyKind,
-    activeLayoutId,
-    activeLayerId,
-    selKey,
-    picking,
-    modal,
-    toast,
-    jsModes,
-    t,
-    layout,
-    layers,
-    layer,
-    baseLayer,
-    board,
-    onKeyClick,
-    applyKey,
-    clearKey,
-    applyEncoder,
-    onJoyClick,
-    onModeClick,
-    applyJoyMode,
-    addJoyMode,
-    deleteJoyMode,
-    selectLayer,
-    addLayer,
-    deleteLayer,
-    renameLayer,
-    startPickTrigger,
-    donePicking,
-    newLayout,
-    deleteLayout,
-    exportConfig,
-    importConfig,
+    config, lang, isDark,
+    boardEditMode, boardSelKey, isCustomBoard, stampTool,
+    enterBoardEdit, exitBoardEdit, setStamp,
+    addKeyToBoard, deleteBoardKey, moveBoardKey, rotateBoardKey,
+    setBoardKeyFinger, setBoardKeyKind, setBoardKeySize,
+    activeLayoutId, activeLayerId, selKey,
+    picking, modal, toast, jsModes, t,
+    layout, layers, layer, baseLayer, board,
+    onKeyClick, applyKey, clearKey, applyEncoder,
+    onJoyClick, onModeClick,
+    applyJoyMode, addJoyMode, deleteJoyMode,
+    selectLayer, addLayer, deleteLayer, renameLayer,
+    startPickTrigger, donePicking,
+    newLayout, deleteLayout,
+    exportConfig, importConfig,
     resetAll,
 } = useConfig()
 
 const stageRef = ref<HTMLElement | null>(null)
 const boardW = computed(() => board.value.widthPx)
 const boardH = computed(() => board.value.heightPx + 30)
-const { scale } = useFit(stageRef, boardW, boardH, 150)
+const { scale } = useFit(stageRef, boardW, boardH, boardEditMode.value ? 80 : 150)
 
 const selPos = computed(() => selKey.value ? board.value.keys.find(k => k.id === selKey.value) ?? null : null)
 const triggerIds = computed(() => {
@@ -63,38 +32,31 @@ const triggerIds = computed(() => {
     if (layer.value.id !== 'base') return layer.value.trigger.keys
     return []
 })
-
 const FINGERS = ['lp', 'lr', 'lm', 'li', 'ri', 'rm', 'rr', 'rp', 'th', 'enc']
 
 function printPage() { window.print() }
 
 function onBoardKeyClick(id: string) {
     boardSelKey.value = boardSelKey.value === id ? null : id
+    selKey.value = id
 }
 
 function onStageClick(e: MouseEvent) {
-    if (!boardEditMode.value || !stageRef.value) return
+    if (!boardEditMode.value || !stageRef.value || !stampTool.value) return
     const target = e.target as HTMLElement
-    if (target.closest('.key') || target.closest('.joystick') || target.closest('.be-banner') || target.closest('.be-panel')) return
+    if (target.closest('.key') || target.closest('.joystick')) return
 
     const rect = stageRef.value.getBoundingClientRect()
-    const stageW = rect.width
-    const stageH = rect.height
-    const bW = board.value.widthPx
-    const bH = board.value.heightPx
     const s = scale.value
+    const originX = (rect.width  - board.value.widthPx  * s) / 2
+    const originY = (rect.height - board.value.heightPx * s) / 2
 
-    const originX = (stageW - bW * s) / 2
-    const originY = (stageH - bH * s) / 2
-
-    const bx = (e.clientX - rect.left - originX) / s
-    const by = (e.clientY - rect.top - originY) / s
+    const bx = (e.clientX - rect.left  - originX) / s
+    const by = (e.clientY - rect.top   - originY) / s
 
     const gx = Math.floor(bx / 64)
     const gy = Math.floor(by / 64)
-
     if (gx < 0 || gy < 0 || gx > 24 || gy > 18) return
-
     addKeyToBoard(gx, gy)
 }
 </script>
@@ -122,81 +84,106 @@ function onStageClick(e: MouseEvent) {
         @enter-board-edit="enterBoardEdit"
     />
 
-    <div ref="stageRef" class="stage" :class="boardEditMode ? 'edit-mode' : ''" @click="onStageClick">
-        <div v-if="!boardEditMode" class="layer-banner">
-            <span class="dot" :style="{ background: layer.color }" />
-            <span class="name">{{ layer.name[lang] ?? layer.name.fr }}</span>
-            <span v-if="layer.id !== 'base'" class="trig">
-                {{ t.trigger }}: {{ layer.trigger.label[lang] ?? layer.trigger.label.fr ?? '—' }}
-            </span>
-        </div>
+    <div class="app-main">
+        <TheBoardSidebar
+            v-if="boardEditMode"
+            :board="board"
+            :board-sel-key="boardSelKey"
+            :sel-key="selKey"
+            :stamp-tool="stampTool"
+            :lang="lang"
+            :t="t"
+            @exit="exitBoardEdit"
+            @stamp="setStamp"
+            @move="(id, dx, dy) => moveBoardKey(id, dx, dy)"
+            @rotate="(id, deg) => rotateBoardKey(id, deg)"
+            @set-finger="(id, f) => setBoardKeyFinger(id, f)"
+            @set-kind="(id, k) => setBoardKeyKind(id, k)"
+            @set-size="(id, w, h) => setBoardKeySize(id, w, h)"
+            @delete="deleteBoardKey"
+        />
 
-        <div class="board-wrap" :style="{ transform: `scale(${scale})` }">
-            <TheKeyboard
-                :board="board"
-                :layer="layer"
-                :base-layer="baseLayer"
-                :show-legends="config.showLegends && !boardEditMode"
-                :selected-id="boardEditMode ? boardSelKey : selKey"
-                :trigger-ids="boardEditMode ? [] : triggerIds"
-                :joysticks="layout.joysticks ?? null"
-                :js-modes="jsModes"
-                :t="t"
-                @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
-                @joy-click="onJoyClick"
-                @mode-click="onModeClick"
-            />
-        </div>
+        <div
+            ref="stageRef"
+            class="stage"
+            :class="boardEditMode ? 'edit-mode' : ''"
+            @click="onStageClick"
+        >
+            <div v-if="!boardEditMode" class="layer-banner">
+                <span class="dot" :style="{ background: layer.color }" />
+                <span class="name">{{ layer.name[lang] ?? layer.name.fr }}</span>
+                <span v-if="layer.id !== 'base'" class="trig">
+                    {{ t.trigger }}: {{ layer.trigger.label[lang] ?? layer.trigger.label.fr ?? '—' }}
+                </span>
+            </div>
 
-        <template v-if="!boardEditMode">
-            <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
+            <div class="board-wrap" :style="{ transform: `scale(${scale})` }">
+                <TheKeyboard
+                    :board="board"
+                    :layer="layer"
+                    :base-layer="baseLayer"
+                    :show-legends="config.showLegends && !boardEditMode"
+                    :selected-id="boardEditMode ? boardSelKey : selKey"
+                    :trigger-ids="boardEditMode ? [] : triggerIds"
+                    :joysticks="layout.joysticks ?? null"
+                    :js-modes="jsModes"
+                    :t="t"
+                    @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
+                    @joy-click="onJoyClick"
+                    @mode-click="onModeClick"
+                />
+            </div>
 
-            <div class="flegend">
-                <div class="ft">{{ t.fingers }}</div>
-                <div class="fl-grid">
-                    <div v-for="f in FINGERS" :key="f" class="fi">
-                        <span class="sw" :style="{ background: `var(--f-${f})` }" />
-                        {{ t.fingerNames[f] }}
+            <template v-if="!boardEditMode">
+                <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
+
+                <div class="flegend">
+                    <div class="ft">{{ t.fingers }}</div>
+                    <div class="fl-grid">
+                        <div v-for="f in FINGERS" :key="f" class="fi">
+                            <span class="sw" :style="{ background: `var(--f-${f})` }" />
+                            {{ t.fingerNames[f] }}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div v-if="picking" class="trigbar">
-                <span>{{ t.pickTrigger }}</span>
-                <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
-                <button class="btn" @click="donePicking()">{{ t.done }}</button>
-            </div>
+                <div v-if="picking" class="trigbar">
+                    <span>{{ t.pickTrigger }}</span>
+                    <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
+                    <button class="btn" @click="donePicking()">{{ t.done }}</button>
+                </div>
 
-            <TheKeyEditor
-                v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
-                :key="selKey ?? ''"
-                :pos="selPos"
-                :def="layer.keys[selKey!] ?? null"
-                :base="baseLayer.keys[selKey!] ?? null"
-                :is-base-layer="layer.id === 'base'"
-                :t="t"
-                @apply="applyKey"
-                @clear="clearKey"
-                @close="selKey = null"
-            />
-        </template>
+                <TheKeyEditor
+                    v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+                    :key="selKey ?? ''"
+                    :pos="selPos"
+                    :def="layer.keys[selKey!] ?? null"
+                    :base="baseLayer.keys[selKey!] ?? null"
+                    :is-base-layer="layer.id === 'base'"
+                    :t="t"
+                    @apply="applyKey"
+                    @clear="clearKey"
+                    @close="selKey = null"
+                />
+            </template>
 
-        <template v-if="boardEditMode">
-            <TheBoardEditor
-                :board="board"
-                :board-sel-key="boardSelKey"
-                :lang="lang"
-                :t="t"
-                @exit="exitBoardEdit"
-                @move="(id, dx, dy) => moveBoardKey(id, dx, dy)"
-                @rotate="(id, deg) => rotateBoardKey(id, deg)"
-                @set-finger="(id, f) => setBoardKeyFinger(id, f)"
-                @set-kind="(id, k) => setBoardKeyKind(id, k)"
-                @delete="deleteBoardKey"
-            />
-        </template>
+            <template v-if="boardEditMode">
+                <TheKeyEditor
+                    v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+                    :key="selKey ?? ''"
+                    :pos="selPos"
+                    :def="layer.keys[selKey!] ?? null"
+                    :base="baseLayer.keys[selKey!] ?? null"
+                    :is-base-layer="layer.id === 'base'"
+                    :t="t"
+                    @apply="applyKey"
+                    @clear="clearKey"
+                    @close="selKey = null; boardSelKey = null"
+                />
+            </template>
 
-        <div :class="['toast', toast ? 'show' : '']">{{ toast }}</div>
+            <div :class="['toast', toast ? 'show' : '']">{{ toast }}</div>
+        </div>
     </div>
 
     <TheLayerRail
@@ -232,10 +219,6 @@ function onStageClick(e: MouseEvent) {
 </div>
 
 <Teleport to="body">
-    <ThePrintView
-        :layout="layout"
-        :lang="lang"
-        :show-legends="config.showLegends"
-    />
+    <ThePrintView :layout="layout" :lang="lang" :show-legends="config.showLegends" />
 </Teleport>
 </template>
