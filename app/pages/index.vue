@@ -5,6 +5,7 @@ import { useFit } from '~/composables/useFit'
 const {
     config,
     lang,
+    isDark,
     activeLayoutId,
     activeLayerId,
     selKey,
@@ -64,9 +65,11 @@ function printPage() { window.print() }
         :active-layout-id="activeLayoutId"
         :show-legends="config.showLegends"
         :lang="lang"
+        :is-dark="isDark"
         :t="t"
         @update:active-layout-id="id => { activeLayoutId = id; activeLayerId = 'base' }"
         @update:lang="l => { lang = l }"
+        @update:is-dark="v => { isDark = v }"
         @toggle-legends="config.showLegends = !config.showLegends"
         @new-layout="modal = { kind: 'newLayout', name: '', mode: 'blank' }"
         @delete-layout="deleteLayout()"
@@ -166,10 +169,13 @@ function printPage() { window.print() }
         @update:js-modes="m => { jsModes = m }"
     />
 
+</div>
+
+<Teleport to="body">
     <ThePrintView
         :layout="layout"
         :lang="lang"
         :show-legends="config.showLegends"
     />
-</div>
+</Teleport>
 </template>

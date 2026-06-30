@@ -5,7 +5,19 @@ import { I18N } from '~/data/i18n'
 import { getBoard } from '~/data/geometry'
 
 const STORE = 'clavis-lab-config-v1'
+const THEME_KEY = 'clavis-lab-theme'
 const LAYER_COLORS = ['#2D6CDF', '#1F8A5B', '#C9821F', '#8A4FC9', '#C9466B', '#0E9BA8', '#5b6270', '#d4357a']
+
+function loadTheme(): boolean {
+    try { return localStorage.getItem(THEME_KEY) === 'dark' } catch (_e) { return false }
+}
+
+const isDark = ref(loadTheme())
+
+watch(isDark, v => {
+    try { localStorage.setItem(THEME_KEY, v ? 'dark' : 'light') } catch (_e) {}
+    document.documentElement.setAttribute('data-theme', v ? 'dark' : 'light')
+}, { immediate: true })
 
 function loadConfig(): IConfig {
     const def = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as IConfig
@@ -271,6 +283,7 @@ export function useConfig() {
     return {
         config,
         lang,
+        isDark,
         activeLayoutId,
         activeLayerId,
         selKey,

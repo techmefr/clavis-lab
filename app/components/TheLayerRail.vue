@@ -19,40 +19,47 @@ defineEmits<{
 
 <template>
 <div class="rail">
-    <span class="label">{{ t.layers }}</span>
-    <div
-        v-for="(l, i) in layers"
-        :key="l.id"
-        :class="['chip', l.id === activeLayerId ? 'active' : '']"
-        :style="{ '--chip': l.color }"
-        @click="$emit('select', l.id)"
-    >
-        <span class="cidx mono">{{ String(i).padStart(2, '0') }}</span>
-        <div class="top">
-            <span class="cdot" />
-            <span class="cname">{{ l.name[lang] ?? l.name.fr }}</span>
+    <div class="rail-track">
+        <div
+            v-for="(l, i) in layers"
+            :key="l.id"
+            :class="['chip', l.id === activeLayerId ? 'active' : '']"
+            :style="{ '--chip': l.color }"
+            @click="$emit('select', l.id)"
+        >
+            <div class="chip-top">
+                <span class="chip-idx mono">{{ String(i + 1).padStart(2, '0') }}</span>
+                <div class="chip-actions">
+                    <button
+                        class="chip-act"
+                        :title="t.rename"
+                        @click.stop="$emit('rename', l.id, l.name[lang] ?? l.name.fr)"
+                    >✎</button>
+                    <button
+                        v-if="l.id !== 'base'"
+                        class="chip-act"
+                        :title="t.trigger"
+                        @click.stop="$emit('pickTrigger', l.id)"
+                    >⌖</button>
+                    <button
+                        v-if="l.id !== 'base'"
+                        class="chip-act danger"
+                        :title="t.del"
+                        @click.stop="$emit('delete', l.id)"
+                    >✕</button>
+                </div>
+            </div>
+            <div class="chip-body">
+                <span class="chip-dot" />
+                <span class="chip-name">{{ l.name[lang] ?? l.name.fr }}</span>
+            </div>
+            <span class="chip-trig">{{ l.id === 'base' ? t.base : (l.trigger.label[lang] ?? l.trigger.label.fr ?? '—') }}</span>
         </div>
-        <span class="ctrig">{{ l.id === 'base' ? t.base : (l.trigger.label[lang] ?? l.trigger.label.fr ?? '—') }}</span>
-        <div v-if="l.id === activeLayerId" style="display: flex; gap: 4px; margin-top: 4px">
-            <button
-                class="btn ghost sm"
-                :title="t.rename"
-                @click.stop="$emit('rename', l.id, l.name[lang] ?? l.name.fr)"
-            >✎</button>
-            <button
-                v-if="l.id !== 'base'"
-                class="btn ghost sm"
-                :title="t.trigger"
-                @click.stop="$emit('pickTrigger', l.id)"
-            >⌖</button>
-            <button
-                v-if="l.id !== 'base'"
-                class="btn ghost sm cdel"
-                :title="t.del"
-                @click.stop="$emit('delete', l.id)"
-            >✕</button>
-        </div>
+
+        <button class="chip-add" :title="t.addLayer" @click="$emit('add')">
+            <span class="chip-add-icon">＋</span>
+            <span class="chip-add-label">{{ t.addLayer }}</span>
+        </button>
     </div>
-    <div class="chip add" :title="t.addLayer" @click="$emit('add')">＋</div>
 </div>
 </template>
