@@ -82,6 +82,9 @@ const handName = computed(() => {
                 <div :class="['opt', layoutMode === 'dup' ? 'sel' : '']" @click="layoutMode = 'dup'">
                     <span>⧉</span> {{ t.duplicate }}
                 </div>
+                <div :class="['opt', layoutMode === 'whiteboard' ? 'sel' : '']" @click="layoutMode = 'whiteboard'">
+                    <span>⊞</span> {{ t.whiteboard }}
+                </div>
             </div>
             <div class="row">
                 <button class="btn" @click="emit('close')">{{ t.cancel }}</button>

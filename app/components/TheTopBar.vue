@@ -7,6 +7,8 @@ const props = defineProps<{
     showLegends: boolean
     lang: ILang
     isDark: boolean
+    isCustomBoard: boolean
+    boardEditMode: boolean
     t: II18nStrings
 }>()
 
@@ -17,6 +19,7 @@ const emit = defineEmits<{
     toggleLegends: []
     newLayout: []
     deleteLayout: []
+    enterBoardEdit: []
     import: [file: File]
     export: []
     exportPdf: []
@@ -110,6 +113,14 @@ const i = computed(() => ({
 
                 <button class="lm-item lm-new" @click="$emit('newLayout'); layoutOpen = false">
                     <span class="lm-icon">＋</span>{{ i.new }}
+                </button>
+                <button
+                    v-if="isCustomBoard"
+                    class="lm-item lm-build"
+                    :class="boardEditMode ? 'lm-build-active' : ''"
+                    @click="$emit('enterBoardEdit'); layoutOpen = false"
+                >
+                    <span class="lm-icon">⊞</span>{{ t.modifyBoard }}
                 </button>
                 <button
                     v-if="layouts.length > 1"

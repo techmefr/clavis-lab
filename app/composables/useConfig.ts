@@ -1,5 +1,5 @@
 import { ref, computed, watch } from 'vue'
-import type { IConfig, ILang, IKeyDef, IEncoderDef, IModal, IJoystickDir, ILayer, ILayout, IBoard, II18nStrings } from '~/types'
+import type { IConfig, ILang, IKeyDef, IEncoderDef, IModal, IJoystickDir, ILayer, ILayout, IBoard, II18nStrings, IKeyPos } from '~/types'
 import { DEFAULT_CONFIG } from '~/data/config'
 import { I18N } from '~/data/i18n'
 import { getBoard } from '~/data/geometry'
@@ -65,12 +65,19 @@ const modal = ref<IModal | null>(null)
 const toast = ref('')
 const jsModes = ref<Record<string, number>>({ L: 0, R: 0 })
 
+const boardEditMode = ref(false)
+const boardSelKey = ref<string | null>(null)
+
 const t = computed<II18nStrings>(() => I18N[lang.value])
 const layout = computed<ILayout>(() => config.value.layouts.find(l => l.id === activeLayoutId.value) ?? config.value.layouts[0] as ILayout)
 const layers = computed<ILayer[]>(() => layout.value.layers)
 const layer = computed<ILayer>(() => layers.value.find(l => l.id === activeLayerId.value) ?? layers.value[0] as ILayer)
 const baseLayer = computed<ILayer>(() => layers.value.find(l => l.id === 'base') ?? layers.value[0] as ILayer)
-const board = computed<IBoard>(() => getBoard(layout.value.board))
+const board = computed<IBoard>(() => {
+    const id = layout.value.board
+    return config.value.customBoards?.find(b => b.id === id) ?? getBoard(id)
+})
+const isCustomBoard = computed(() => board.value.isCustom === true)
 
 watch([config, lang, activeLayoutId, activeLayerId], () => {
     const c = { ...config.value, lang: lang.value, activeLayout: activeLayoutId.value, activeLayer: activeLayerId.value }
@@ -216,7 +223,16 @@ function donePicking() {
 
 function newLayout(name: string, mode: string) {
     const id = 'layout' + Date.now()
+    const boardId = mode === 'whiteboard' ? 'board-' + Date.now() : 'cheapino-v2'
     update(c => {
+        if (mode === 'whiteboard') {
+            if (!c.customBoards) c.customBoards = []
+            c.customBoards.push({
+                id: boardId, isCustom: true,
+                U: 1, KEYW: 58, KEYH: 58,
+                keys: [], widthPx: 512, heightPx: 320, matrixIds: [],
+            })
+        }
         let lyrs: ILayer[]
         if (mode === 'dup') {
             lyrs = JSON.parse(JSON.stringify(curLayout(c).layers))
@@ -227,11 +243,12 @@ function newLayout(name: string, mode: string) {
                 keys: {}, encoder: { ccw: '↑', cw: '↓', press: '⏯' },
             }]
         }
-        c.layouts.push({ id, name, board: 'cheapino-v2', layers: lyrs })
+        c.layouts.push({ id, name, board: boardId, layers: lyrs })
     })
     activeLayoutId.value = id
     activeLayerId.value = 'base'
     modal.value = null
+    if (mode === 'whiteboard') boardEditMode.value = true
 }
 
 function deleteLayout() {
@@ -269,6 +286,85 @@ function importConfig(file: File) {
     r.readAsText(file)
 }
 
+function enterBoardEdit() { boardEditMode.value = true; selKey.value = null; boardSelKey.value = null }
+function exitBoardEdit() { boardEditMode.value = false; boardSelKey.value = null }
+
+function updateBoardDef(mut: (b: IBoard) => void) {
+    const bid = layout.value.board
+    update(c => {
+        if (!c.customBoards) c.customBoards = []
+        const b = c.customBoards.find(x => x.id === bid)
+        if (b) mut(b)
+    })
+}
+
+function recalcBoardSize(b: IBoard) {
+    if (!b.keys.length) { b.widthPx = 512; b.heightPx = 320; return }
+    const maxX = Math.max(...b.keys.map(k => k.x)) + 1
+    const maxY = Math.max(...b.keys.map(k => k.y)) + 1
+    b.widthPx = Math.max(512, maxX * 64 + 64)
+    b.heightPx = Math.max(320, maxY * 64 + 64)
+}
+
+function addKeyToBoard(gridX: number, gridY: number) {
+    if (!isCustomBoard.value) return
+    if (board.value.keys.find(k => k.x === gridX && k.y === gridY)) return
+    const id = 'k' + Date.now()
+    updateBoardDef(b => {
+        b.keys.push({ id, x: gridX, y: gridY, kind: 'matrix', finger: 'ri', hand: 'r' })
+        b.matrixIds = b.keys.filter(k => k.kind !== 'encoder').map(k => k.id)
+        recalcBoardSize(b)
+    })
+    boardSelKey.value = id
+}
+
+function deleteBoardKey(id: string) {
+    updateBoardDef(b => {
+        b.keys = b.keys.filter(k => k.id !== id)
+        b.matrixIds = b.keys.filter(k => k.kind !== 'encoder').map(k => k.id)
+        recalcBoardSize(b)
+    })
+    if (boardSelKey.value === id) boardSelKey.value = null
+}
+
+function moveBoardKey(id: string, dx: number, dy: number) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        const nx = k.x + dx
+        const ny = k.y + dy
+        if (nx < 0 || ny < 0) return
+        if (b.keys.find(x => x.id !== id && x.x === nx && x.y === ny)) return
+        k.x = nx; k.y = ny
+        recalcBoardSize(b)
+    })
+}
+
+function rotateBoardKey(id: string, deg: number) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (k) k.rot = ((k.rot ?? 0) + deg + 360) % 360
+    })
+}
+
+function setBoardKeyFinger(id: string, finger: string) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        k.finger = finger
+        k.hand = finger.startsWith('l') ? 'l' : 'r'
+    })
+}
+
+function setBoardKeyKind(id: string, kind: IKeyPos['kind']) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        k.kind = kind
+        b.matrixIds = b.keys.filter(x => x.kind !== 'encoder').map(x => x.id)
+    })
+}
+
 function resetAll() {
     if (!confirm(lang.value === 'fr' ? 'Réinitialiser tout ?' : 'Reset everything?')) return
     localStorage.removeItem(STORE)
@@ -284,6 +380,17 @@ export function useConfig() {
         config,
         lang,
         isDark,
+        boardEditMode,
+        boardSelKey,
+        isCustomBoard,
+        enterBoardEdit,
+        exitBoardEdit,
+        addKeyToBoard,
+        deleteBoardKey,
+        moveBoardKey,
+        rotateBoardKey,
+        setBoardKeyFinger,
+        setBoardKeyKind,
         activeLayoutId,
         activeLayerId,
         selKey,

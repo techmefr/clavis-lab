@@ -6,6 +6,17 @@ const {
     config,
     lang,
     isDark,
+    boardEditMode,
+    boardSelKey,
+    isCustomBoard,
+    enterBoardEdit,
+    exitBoardEdit,
+    addKeyToBoard,
+    deleteBoardKey,
+    moveBoardKey,
+    rotateBoardKey,
+    setBoardKeyFinger,
+    setBoardKeyKind,
     activeLayoutId,
     activeLayerId,
     selKey,
@@ -56,6 +67,36 @@ const triggerIds = computed(() => {
 const FINGERS = ['lp', 'lr', 'lm', 'li', 'ri', 'rm', 'rr', 'rp', 'th', 'enc']
 
 function printPage() { window.print() }
+
+function onBoardKeyClick(id: string) {
+    boardSelKey.value = boardSelKey.value === id ? null : id
+}
+
+function onStageClick(e: MouseEvent) {
+    if (!boardEditMode.value || !stageRef.value) return
+    const target = e.target as HTMLElement
+    if (target.closest('.key') || target.closest('.joystick') || target.closest('.be-banner') || target.closest('.be-panel')) return
+
+    const rect = stageRef.value.getBoundingClientRect()
+    const stageW = rect.width
+    const stageH = rect.height
+    const bW = board.value.widthPx
+    const bH = board.value.heightPx
+    const s = scale.value
+
+    const originX = (stageW - bW * s) / 2
+    const originY = (stageH - bH * s) / 2
+
+    const bx = (e.clientX - rect.left - originX) / s
+    const by = (e.clientY - rect.top - originY) / s
+
+    const gx = Math.floor(bx / 64)
+    const gy = Math.floor(by / 64)
+
+    if (gx < 0 || gy < 0 || gx > 24 || gy > 18) return
+
+    addKeyToBoard(gx, gy)
+}
 </script>
 
 <template>
@@ -66,8 +107,10 @@ function printPage() { window.print() }
         :show-legends="config.showLegends"
         :lang="lang"
         :is-dark="isDark"
+        :is-custom-board="isCustomBoard"
+        :board-edit-mode="boardEditMode"
         :t="t"
-        @update:active-layout-id="id => { activeLayoutId = id; activeLayerId = 'base' }"
+        @update:active-layout-id="id => { activeLayoutId = id; activeLayerId = 'base'; exitBoardEdit() }"
         @update:lang="l => { lang = l }"
         @update:is-dark="v => { isDark = v }"
         @toggle-legends="config.showLegends = !config.showLegends"
@@ -76,10 +119,11 @@ function printPage() { window.print() }
         @import="importConfig"
         @export="exportConfig()"
         @export-pdf="printPage"
+        @enter-board-edit="enterBoardEdit"
     />
 
-    <div ref="stageRef" class="stage">
-        <div class="layer-banner">
+    <div ref="stageRef" class="stage" :class="boardEditMode ? 'edit-mode' : ''" @click="onStageClick">
+        <div v-if="!boardEditMode" class="layer-banner">
             <span class="dot" :style="{ background: layer.color }" />
             <span class="name">{{ layer.name[lang] ?? layer.name.fr }}</span>
             <span v-if="layer.id !== 'base'" class="trig">
@@ -92,50 +136,67 @@ function printPage() { window.print() }
                 :board="board"
                 :layer="layer"
                 :base-layer="baseLayer"
-                :show-legends="config.showLegends"
-                :selected-id="selKey"
-                :trigger-ids="triggerIds"
+                :show-legends="config.showLegends && !boardEditMode"
+                :selected-id="boardEditMode ? boardSelKey : selKey"
+                :trigger-ids="boardEditMode ? [] : triggerIds"
                 :joysticks="layout.joysticks ?? null"
                 :js-modes="jsModes"
                 :t="t"
-                @key-click="onKeyClick"
+                @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
                 @joy-click="onJoyClick"
                 @mode-click="onModeClick"
             />
         </div>
 
-        <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
+        <template v-if="!boardEditMode">
+            <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
 
-        <div class="flegend">
-            <div class="ft">{{ t.fingers }}</div>
-            <div class="fl-grid">
-                <div v-for="f in FINGERS" :key="f" class="fi">
-                    <span class="sw" :style="{ background: `var(--f-${f})` }" />
-                    {{ t.fingerNames[f] }}
+            <div class="flegend">
+                <div class="ft">{{ t.fingers }}</div>
+                <div class="fl-grid">
+                    <div v-for="f in FINGERS" :key="f" class="fi">
+                        <span class="sw" :style="{ background: `var(--f-${f})` }" />
+                        {{ t.fingerNames[f] }}
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div v-if="picking" class="trigbar">
-            <span>{{ t.pickTrigger }}</span>
-            <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
-            <button class="btn" @click="donePicking()">{{ t.done }}</button>
-        </div>
+            <div v-if="picking" class="trigbar">
+                <span>{{ t.pickTrigger }}</span>
+                <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
+                <button class="btn" @click="donePicking()">{{ t.done }}</button>
+            </div>
+
+            <TheKeyEditor
+                v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+                :key="selKey ?? ''"
+                :pos="selPos"
+                :def="layer.keys[selKey!] ?? null"
+                :base="baseLayer.keys[selKey!] ?? null"
+                :is-base-layer="layer.id === 'base'"
+                :t="t"
+                @apply="applyKey"
+                @clear="clearKey"
+                @close="selKey = null"
+            />
+        </template>
+
+        <template v-if="boardEditMode">
+            <TheBoardEditor
+                :board="board"
+                :board-sel-key="boardSelKey"
+                :lang="lang"
+                :t="t"
+                @exit="exitBoardEdit"
+                @move="(id, dx, dy) => moveBoardKey(id, dx, dy)"
+                @rotate="(id, deg) => rotateBoardKey(id, deg)"
+                @set-finger="(id, f) => setBoardKeyFinger(id, f)"
+                @set-kind="(id, k) => setBoardKeyKind(id, k)"
+                @delete="deleteBoardKey"
+            />
+        </template>
 
         <div :class="['toast', toast ? 'show' : '']">{{ toast }}</div>
-
-        <TheKeyEditor
-            v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
-            :key="selKey ?? ''"
-            :pos="selPos"
-            :def="layer.keys[selKey!] ?? null"
-            :base="baseLayer.keys[selKey!] ?? null"
-            :is-base-layer="layer.id === 'base'"
-            :t="t"
-            @apply="applyKey"
-            @clear="clearKey"
-            @close="selKey = null"
-        />
     </div>
 
     <TheLayerRail
@@ -168,7 +229,6 @@ function printPage() { window.print() }
         @delete-joy-mode="deleteJoyMode"
         @update:js-modes="m => { jsModes = m }"
     />
-
 </div>
 
 <Teleport to="body">

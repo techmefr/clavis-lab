@@ -29,6 +29,8 @@ export interface IKeyPos {
 }
 
 export interface IBoard {
+    id?: string
+    isCustom?: boolean
     U: number
     KEYW: number
     KEYH: number
@@ -86,6 +88,7 @@ export interface IConfig {
     showLegends: boolean
     lang: string
     layouts: ILayout[]
+    customBoards?: IBoard[]
 }
 
 export type ILang = 'fr' | 'en'
@@ -174,6 +177,14 @@ export interface II18nStrings {
     newLayerName: string
     newLayoutName: string
     blank: string
+    whiteboard: string
+    buildBoard: string
+    exitBuild: string
+    addKeyHint: string
+    modifyBoard: string
+    kindMatrix: string
+    kindThumb: string
+    kindEncoder: string
     keyHint: string
     fingerNames: Record<string, string>
 }
