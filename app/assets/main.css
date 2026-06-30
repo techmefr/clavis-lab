@@ -94,7 +94,49 @@ button { font-family: inherit; cursor: pointer; }
 .tb-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .brand .logo { font-weight: 600; font-size: 15px; letter-spacing: .3px; }
 .brand .logo b { color: var(--accent); font-weight: 700; }
-.layout-sel { padding: 5px 10px; font-size: 13.5px; font-weight: 600; min-width: 140px; }
+/* layout picker */
+.layout-wrap { position: relative; }
+.layout-trigger {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 8px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--ink); font-size: 13.5px; font-weight: 600;
+    min-width: 150px; justify-content: space-between;
+    transition: border-color .12s, background .12s;
+}
+.layout-trigger:hover { border-color: var(--ink-3); background: var(--panel); }
+.layout-trigger.open { border-color: var(--accent); background: var(--panel); }
+.lt-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lt-caret {
+    flex: 0 0 auto; color: var(--ink-3);
+    transition: transform .15s ease-out;
+}
+.layout-trigger.open .lt-caret { transform: rotate(180deg); }
+.layout-menu {
+    position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 11px; padding: 5px;
+    min-width: 200px; z-index: 100;
+    box-shadow: 0 8px 28px oklch(from var(--shadow-ink) l c h / 0.16);
+    animation: sp-in .12s ease-out;
+}
+.lm-item {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 8px 10px; border-radius: 8px; text-align: left;
+    border: 0; background: transparent; font-size: 13px; color: var(--ink);
+    cursor: pointer; transition: background .1s;
+}
+.lm-item:hover { background: var(--panel-2); }
+.lm-item.active { font-weight: 600; }
+.lm-check { font-size: 8px; color: var(--accent); width: 12px; text-align: center; flex: 0 0 auto; }
+.lm-icon { width: 16px; text-align: center; font-size: 12px; flex: 0 0 auto; color: var(--ink-3); }
+.lm-divider { height: 1px; background: var(--line); margin: 4px 0; }
+.lm-new { color: var(--accent); font-weight: 500; }
+.lm-new .lm-icon { color: var(--accent); }
+.lm-del { color: oklch(55% 0.18 27); }
+.lm-del .lm-icon { color: oklch(55% 0.18 27); }
+.lm-del:hover { background: oklch(97% 0.008 27); }
+
 .legends-btn { display: inline-flex; align-items: center; gap: 5px; }
 .legends-btn.active { color: var(--accent); }
 .legends-btn.active:hover { color: var(--accent); }

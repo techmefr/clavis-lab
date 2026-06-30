@@ -25,6 +25,10 @@ const emit = defineEmits<{
 const fileInput = ref<HTMLInputElement | null>(null)
 const settingsOpen = ref(false)
 const settingsRef = ref<HTMLElement | null>(null)
+const layoutOpen = ref(false)
+const layoutRef = ref<HTMLElement | null>(null)
+
+const activeLayout = computed(() => props.layouts.find(l => l.id === props.activeLayoutId) ?? props.layouts[0])
 
 function onFileChange(e: Event) {
     const input = e.target as HTMLInputElement
@@ -34,24 +38,37 @@ function onFileChange(e: Event) {
     input.value = ''
 }
 
-function toggleSettings() { settingsOpen.value = !settingsOpen.value }
-function closeSettings() { settingsOpen.value = false }
-function triggerImport() { closeSettings(); fileInput.value?.click() }
-function triggerExport() { closeSettings(); emit('export') }
-function triggerPdf() { closeSettings(); emit('exportPdf') }
+function selectLayout(id: string) {
+    emit('update:activeLayoutId', id)
+    layoutOpen.value = false
+}
+
+function deleteLayout() {
+    emit('deleteLayout')
+    layoutOpen.value = false
+}
+
+function closeAll() { settingsOpen.value = false; layoutOpen.value = false }
 
 onMounted(() => document.addEventListener('click', onDocClick))
 onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 function onDocClick(e: MouseEvent) {
-    if (settingsRef.value && !settingsRef.value.contains(e.target as Node)) closeSettings()
+    if (settingsRef.value && !settingsRef.value.contains(e.target as Node)) settingsOpen.value = false
+    if (layoutRef.value && !layoutRef.value.contains(e.target as Node)) layoutOpen.value = false
 }
+
+function triggerImport() { closeAll(); fileInput.value?.click() }
+function triggerExport() { closeAll(); emit('export') }
+function triggerPdf() { closeAll(); emit('exportPdf') }
 
 const i = computed(() => ({
     lang:   props.lang === 'fr' ? 'Langue'   : 'Language',
     theme:  props.lang === 'fr' ? 'Thème'    : 'Theme',
     import: props.lang === 'fr' ? 'Importer' : 'Import',
     export: props.lang === 'fr' ? 'Exporter' : 'Export',
+    new:    props.lang === 'fr' ? 'Nouvelle disposition' : 'New layout',
+    del:    props.lang === 'fr' ? 'Supprimer cette disposition' : 'Delete this layout',
 }))
 </script>
 
@@ -64,22 +81,45 @@ const i = computed(() => ({
         </div>
     </div>
 
-    <!-- Center -->
+    <!-- Center: layout picker -->
     <div class="tb-center">
-        <select
-            class="sel layout-sel"
-            :value="activeLayoutId"
-            @change="$emit('update:activeLayoutId', ($event.target as HTMLSelectElement).value)"
-        >
-            <option v-for="l in layouts" :key="l.id" :value="l.id">{{ l.name }}</option>
-        </select>
-        <button class="btn ghost sm" :title="t.newLayout" @click="$emit('newLayout')">＋</button>
-        <button
-            v-if="layouts.length > 1"
-            class="btn ghost sm"
-            :title="t.del"
-            @click="$emit('deleteLayout')"
-        >✕</button>
+        <div ref="layoutRef" class="layout-wrap">
+            <button
+                class="layout-trigger"
+                :class="layoutOpen ? 'open' : ''"
+                @click.stop="layoutOpen = !layoutOpen"
+            >
+                <span class="lt-name">{{ activeLayout?.name }}</span>
+                <svg class="lt-caret" width="10" height="6" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+                    <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+
+            <div v-if="layoutOpen" class="layout-menu" @click.stop>
+                <button
+                    v-for="l in layouts"
+                    :key="l.id"
+                    :class="['lm-item', l.id === activeLayoutId ? 'active' : '']"
+                    @click="selectLayout(l.id)"
+                >
+                    <span class="lm-check">{{ l.id === activeLayoutId ? '●' : '○' }}</span>
+                    {{ l.name }}
+                </button>
+
+                <div class="lm-divider" />
+
+                <button class="lm-item lm-new" @click="$emit('newLayout'); layoutOpen = false">
+                    <span class="lm-icon">＋</span>{{ i.new }}
+                </button>
+                <button
+                    v-if="layouts.length > 1"
+                    class="lm-item lm-del"
+                    @click="deleteLayout"
+                >
+                    <span class="lm-icon">✕</span>{{ i.del }}
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Right -->
@@ -106,7 +146,7 @@ const i = computed(() => ({
                 class="btn ghost sm settings-btn"
                 :class="settingsOpen ? 'active' : ''"
                 :title="lang === 'fr' ? 'Réglages' : 'Settings'"
-                @click.stop="toggleSettings"
+                @click.stop="settingsOpen = !settingsOpen"
             >
                 <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
                     <line x1="1" y1="2" x2="14" y2="2"/>
