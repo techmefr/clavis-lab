@@ -50,6 +50,8 @@ const rotateState = ref<RotateState | null>(null)
 const resizeState = ref<ResizeState | null>(null)
 let dragMoved = false
 
+const isKeyEditing = ref(false)
+
 const selResizable = computed(() => RESIZABLE_KINDS.has(selPos.value?.kind ?? ''))
 
 function clientToBoard(cx: number, cy: number): { bx: number; by: number } {
@@ -177,9 +179,36 @@ function onBoardKeyClick(id: string) {
     selKey.value = id
 }
 
+function onNormalKeyClick(id: string) {
+    onKeyClick(id)
+    isKeyEditing.value = false
+}
+
+function onStageDblClick(e: MouseEvent) {
+    if (boardEditMode.value) return
+    const target = e.target as HTMLElement
+    const keyEl = target.closest('[data-key-id]') as HTMLElement | null
+    if (!keyEl) return
+    const id = keyEl.getAttribute('data-key-id')!
+    const key = board.value.keys.find(k => k.id === id)
+    if (!key || (key.kind !== 'matrix' && key.kind !== 'thumb')) return
+    selKey.value = id
+    isKeyEditing.value = true
+}
+
 function onStageClick(e: MouseEvent) {
-    if (!boardEditMode.value || !stageRef.value) return
+    if (!stageRef.value) return
     closeCtxMenu()
+
+    if (!boardEditMode.value) {
+        const target = e.target as HTMLElement
+        if (!target.closest('[data-key-id]') && !target.closest('.board-sidebar') && !target.closest('.editor')) {
+            selKey.value = null
+            isKeyEditing.value = false
+        }
+        return
+    }
+
     if (dragMoved) { dragMoved = false; return }
     const target = e.target as HTMLElement
     if (target.closest('[data-key-id]') || target.closest('.board-sidebar')) return
@@ -235,7 +264,13 @@ function ctxRotate(deg: number) {
 }
 
 function onKeyboardShortcut(e: KeyboardEvent) {
-    if (!boardEditMode.value) return
+    if (!boardEditMode.value) {
+        if (e.key === 'Escape') {
+            if (isKeyEditing.value) { isKeyEditing.value = false; return }
+            if (selKey.value) { selKey.value = null }
+        }
+        return
+    }
     const id = boardSelKey.value
 
     if (e.key === 'Escape') {
@@ -306,6 +341,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
         class="stage"
         :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '', isRotating ? 'rotating' : '', isResizing ? 'resizing' : '']"
         @click="onStageClick"
+        @dblclick="onStageDblClick"
         @contextmenu="onStageContextmenu"
         @mousedown="onBoardMousedown"
         @mousemove="onBoardMousemove"
@@ -320,6 +356,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
             :stamp-tool="stampTool"
             :lang="lang"
             :t="t"
+            :build-mode="true"
             @exit="exitBoardEdit"
             @stamp="setStamp"
             @rotate="(id, deg) => rotateBoardKey(id, deg)"
@@ -327,6 +364,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
             @set-kind="(id, k) => setBoardKeyKind(id, k)"
             @set-size="(id, w, h) => setBoardKeySize(id, w, h)"
             @delete="deleteBoardKey"
+        />
+
+        <TheBoardSidebar
+            v-else-if="selKey !== null"
+            :board="board"
+            :board-sel-key="selKey"
+            :sel-key="selKey"
+            :stamp-tool="null"
+            :lang="lang"
+            :t="t"
+            :build-mode="false"
+            @close="selKey = null; isKeyEditing = false"
+            @set-finger="(id, f) => setBoardKeyFinger(id, f)"
         />
 
         <div v-if="!boardEditMode" class="layer-banner">
@@ -348,7 +398,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
                 :joysticks="layout.joysticks ?? null"
                 :js-modes="jsModes"
                 :t="t"
-                @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
+                @key-click="boardEditMode ? onBoardKeyClick($event) : onNormalKeyClick($event)"
                 @joy-click="boardEditMode ? onBoardKeyClick($event) : onJoyClick($event)"
                 @mode-click="boardEditMode ? onBoardKeyClick($event) : onModeClick($event)"
             />
@@ -403,7 +453,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
             </div>
 
             <TheKeyEditor
-                v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+                v-if="isKeyEditing && selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
                 :key="selKey ?? ''"
                 :pos="selPos"
                 :def="layer.keys[selKey!] ?? null"
@@ -412,7 +462,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
                 :t="t"
                 @apply="applyKey"
                 @clear="clearKey"
-                @close="selKey = null"
+                @close="isKeyEditing = false"
             />
         </template>
 

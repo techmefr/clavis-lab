@@ -30,16 +30,16 @@ test('layout picker closes on outside click', async ({ page }) => {
     await expect(page.locator('.layout-menu')).not.toBeVisible()
 })
 
-test('clicking a key opens the key editor panel', async ({ page }) => {
+test('double-clicking a key opens the key editor panel', async ({ page }) => {
     await expect(page.locator('.editor.open')).toHaveCount(0)
     const firstKey = page.locator('.board-wrap .key').first()
-    await firstKey.click()
+    await firstKey.dblclick()
     await expect(page.locator('.editor.open')).toBeVisible()
     await expect(page.locator('.editor .ehead .t')).toBeVisible()
 })
 
 test('key editor closes with X button', async ({ page }) => {
-    await page.locator('.board-wrap .key').first().click()
+    await page.locator('.board-wrap .key').first().dblclick()
     await expect(page.locator('.editor.open')).toBeVisible()
     await page.locator('.editor button[aria-label="close"]').click()
     await expect(page.locator('.editor.open')).toHaveCount(0)

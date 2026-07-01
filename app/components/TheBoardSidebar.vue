@@ -10,10 +10,12 @@ const props = defineProps<{
     stampTool: StampTool | null
     lang: ILang
     t: II18nStrings
+    buildMode?: boolean
 }>()
 
 const emit = defineEmits<{
     exit: []
+    close: []
     stamp: [tool: StampTool | null]
     rotate: [id: string, deg: number]
     'set-finger': [id: string, finger: string]
@@ -21,6 +23,8 @@ const emit = defineEmits<{
     'set-size': [id: string, w: number, h: number]
     delete: [id: string]
 }>()
+
+const isBuild = computed(() => props.buildMode !== false)
 
 const selPos = computed<IKeyPos | null>(() =>
     props.boardSelKey ? (props.board.keys.find(k => k.id === props.boardSelKey) ?? null) : null
@@ -85,14 +89,19 @@ function onStampClick(s: StampDef) {
 
 <template>
 <div class="board-sidebar">
-    <div class="bs-header">
+    <div v-if="isBuild" class="bs-header">
         <span class="bs-title">{{ t.buildBoard }}</span>
         <span class="bs-count">{{ board.keys.length }} {{ lang === 'fr' ? 'touches' : 'keys' }}</span>
         <div class="spacer" />
         <button class="btn sm" @click="$emit('exit')">{{ t.exitBuild }}</button>
     </div>
+    <div v-else class="bs-header">
+        <span class="bs-title">{{ lang === 'fr' ? 'Touche' : 'Key' }}</span>
+        <div class="spacer" />
+        <button class="btn ghost sm" @click="$emit('close')">×</button>
+    </div>
 
-    <div class="bs-section">
+    <div v-if="isBuild" class="bs-section">
         <div class="bs-sl">{{ lang === 'fr' ? 'Ajouter' : 'Add' }}</div>
         <div class="bs-stamps">
             <button
@@ -132,29 +141,31 @@ function onStampClick(s: StampDef) {
         <div class="bs-sep" />
 
         <div class="bs-section bs-props">
-            <div class="bs-sl">{{ lang === 'fr' ? 'Type' : 'Kind' }}</div>
-            <div class="be-kinds">
-                <button
-                    v-for="k in KINDS"
-                    :key="k.id"
-                    :class="['btn sm', selPos.kind === k.id ? 'primary' : 'ghost']"
-                    @click="$emit('set-kind', selPos.id, k.id)"
-                >{{ k.label }}</button>
-            </div>
-
-            <template v-if="isResizable">
-                <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Taille' : 'Size' }}</div>
+            <template v-if="isBuild">
+                <div class="bs-sl">{{ lang === 'fr' ? 'Type' : 'Kind' }}</div>
                 <div class="be-kinds">
                     <button
-                        v-for="sz in SIZES"
-                        :key="`${sz.w}-${sz.h}`"
-                        :class="['btn sm', (selPos.w ?? 1) === sz.w && (selPos.h ?? 1) === sz.h ? 'primary' : 'ghost']"
-                        @click="$emit('set-size', selPos.id, sz.w, sz.h)"
-                    >{{ sz.label }}</button>
+                        v-for="k in KINDS"
+                        :key="k.id"
+                        :class="['btn sm', selPos.kind === k.id ? 'primary' : 'ghost']"
+                        @click="$emit('set-kind', selPos.id, k.id)"
+                    >{{ k.label }}</button>
                 </div>
+
+                <template v-if="isResizable">
+                    <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Taille' : 'Size' }}</div>
+                    <div class="be-kinds">
+                        <button
+                            v-for="sz in SIZES"
+                            :key="`${sz.w}-${sz.h}`"
+                            :class="['btn sm', (selPos.w ?? 1) === sz.w && (selPos.h ?? 1) === sz.h ? 'primary' : 'ghost']"
+                            @click="$emit('set-size', selPos.id, sz.w, sz.h)"
+                        >{{ sz.label }}</button>
+                    </div>
+                </template>
             </template>
 
-            <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Doigt' : 'Finger' }}</div>
+            <div class="bs-sl" :style="isBuild ? 'margin-top: 10px' : ''">{{ lang === 'fr' ? 'Doigt' : 'Finger' }}</div>
             <div class="bs-fingers">
                 <button
                     v-for="f in FINGERS"
@@ -168,20 +179,22 @@ function onStampClick(s: StampDef) {
                 </button>
             </div>
 
-            <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Rotation' : 'Rotation' }}</div>
-            <div class="be-row">
-                <button class="btn ghost sm" @click="$emit('rotate', selPos.id, -15)">-15°</button>
-                <span class="be-rotval mono">{{ selPos.rot ?? 0 }}°</span>
-                <button class="btn ghost sm" @click="$emit('rotate', selPos.id, 15)">+15°</button>
-            </div>
+            <template v-if="isBuild">
+                <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Rotation' : 'Rotation' }}</div>
+                <div class="be-row">
+                    <button class="btn ghost sm" @click="$emit('rotate', selPos.id, -15)">-15°</button>
+                    <span class="be-rotval mono">{{ selPos.rot ?? 0 }}°</span>
+                    <button class="btn ghost sm" @click="$emit('rotate', selPos.id, 15)">+15°</button>
+                </div>
 
-            <button class="btn be-del" style="margin-top: 14px" @click="$emit('delete', selPos.id)">
-                {{ lang === 'fr' ? 'Supprimer' : 'Delete' }}
-            </button>
+                <button class="btn be-del" style="margin-top: 14px" @click="$emit('delete', selPos.id)">
+                    {{ lang === 'fr' ? 'Supprimer' : 'Delete' }}
+                </button>
+            </template>
         </div>
     </template>
 
-    <div v-else-if="board.keys.length > 0" class="bs-select-hint">
+    <div v-else-if="board.keys.length > 0 && isBuild" class="bs-select-hint">
         <div>{{ lang === 'fr' ? 'Cliquez une touche pour la modifier' : 'Click a key to edit it' }}</div>
         <div class="bs-drag-hint">{{ lang === 'fr' ? 'Glissez pour déplacer · Coins pour tourner' : 'Drag to move · Corners to rotate' }}</div>
     </div>
