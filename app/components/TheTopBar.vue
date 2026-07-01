@@ -20,6 +20,7 @@ const emit = defineEmits<{
     newLayout: []
     deleteLayout: []
     enterBoardEdit: []
+    exitBoardEdit: []
     import: [file: File]
     export: []
     exportPdf: []
@@ -46,11 +47,6 @@ function selectLayout(id: string) {
     layoutOpen.value = false
 }
 
-function deleteLayout() {
-    emit('deleteLayout')
-    layoutOpen.value = false
-}
-
 function closeAll() { settingsOpen.value = false; layoutOpen.value = false }
 
 onMounted(() => document.addEventListener('click', onDocClick))
@@ -66,17 +62,19 @@ function triggerExport() { closeAll(); emit('export') }
 function triggerPdf() { closeAll(); emit('exportPdf') }
 
 const i = computed(() => ({
-    lang:   props.lang === 'fr' ? 'Langue'   : 'Language',
-    theme:  props.lang === 'fr' ? 'Thème'    : 'Theme',
-    import: props.lang === 'fr' ? 'Importer' : 'Import',
-    export: props.lang === 'fr' ? 'Exporter' : 'Export',
-    new:    props.lang === 'fr' ? 'Nouvelle disposition' : 'New layout',
-    del:    props.lang === 'fr' ? 'Supprimer cette disposition' : 'Delete this layout',
+    lang:      props.lang === 'fr' ? 'Langue'   : 'Language',
+    theme:     props.lang === 'fr' ? 'Thème'    : 'Theme',
+    import:    props.lang === 'fr' ? 'Importer' : 'Import',
+    export:    props.lang === 'fr' ? 'Exporter' : 'Export',
+    new:       props.lang === 'fr' ? 'Nouvelle disposition' : 'New layout',
+    edit:      props.lang === 'fr' ? 'Modifier le clavier' : 'Edit keyboard',
+    done:      props.lang === 'fr' ? 'Enregistrer' : 'Save',
+    del:       props.lang === 'fr' ? 'Supprimer' : 'Delete',
 }))
 </script>
 
 <template>
-<div class="topbar">
+<div :class="['topbar', boardEditMode ? 'topbar-build' : '']">
     <!-- Left -->
     <div class="tb-left">
         <div class="brand">
@@ -84,9 +82,17 @@ const i = computed(() => ({
         </div>
     </div>
 
-    <!-- Center: layout picker -->
+    <!-- Center -->
     <div class="tb-center">
-        <div ref="layoutRef" class="layout-wrap">
+        <!-- Board edit mode: non-interactive name -->
+        <div v-if="boardEditMode" class="tb-build-name">
+            <span class="tb-build-label">{{ t.buildBoard }}</span>
+            <span class="tb-build-sep">·</span>
+            <span class="tb-build-layout">{{ activeLayout?.name }}</span>
+        </div>
+
+        <!-- Normal mode: layout picker -->
+        <div v-else ref="layoutRef" class="layout-wrap">
             <button
                 class="layout-trigger"
                 :class="layoutOpen ? 'open' : ''"
@@ -114,88 +120,117 @@ const i = computed(() => ({
                 <button class="lm-item lm-new" @click="$emit('newLayout'); layoutOpen = false">
                     <span class="lm-icon">＋</span>{{ i.new }}
                 </button>
-                <button
-                    v-if="isCustomBoard"
-                    class="lm-item lm-build"
-                    :class="boardEditMode ? 'lm-build-active' : ''"
-                    @click="$emit('enterBoardEdit'); layoutOpen = false"
-                >
-                    <span class="lm-icon">⊞</span>{{ t.modifyBoard }}
-                </button>
-                <button
-                    v-if="layouts.length > 1"
-                    class="lm-item lm-del"
-                    @click="deleteLayout"
-                >
-                    <span class="lm-icon">✕</span>{{ i.del }}
-                </button>
             </div>
         </div>
     </div>
 
     <!-- Right -->
     <div class="tb-right">
-        <button
-            class="btn ghost sm legends-btn"
-            :class="showLegends ? 'active' : ''"
-            :title="t.showLegends"
-            @click="$emit('toggleLegends')"
-        >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-                <rect x="8" y="8" width="5" height="5" rx="1"
-                    :fill="showLegends ? 'currentColor' : 'none'"
-                    stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-            {{ t.showLegends }}
-        </button>
-
-        <div ref="settingsRef" class="settings-wrap">
+        <!-- Board edit mode actions -->
+        <template v-if="boardEditMode">
+            <button class="btn primary sm" @click="$emit('exitBoardEdit')">
+                {{ i.done }}
+            </button>
             <button
-                class="btn ghost sm settings-btn"
-                :class="settingsOpen ? 'active' : ''"
-                :title="lang === 'fr' ? 'Réglages' : 'Settings'"
-                @click.stop="settingsOpen = !settingsOpen"
+                v-if="layouts.length > 1"
+                class="btn ghost sm tb-del"
+                :title="i.del"
+                @click="$emit('deleteLayout')"
             >
-                <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-                    <line x1="1" y1="2" x2="14" y2="2"/>
-                    <circle cx="10" cy="2" r="1.75" fill="var(--panel)" stroke="currentColor"/>
-                    <line x1="1" y1="6.5" x2="14" y2="6.5"/>
-                    <circle cx="5" cy="6.5" r="1.75" fill="var(--panel)" stroke="currentColor"/>
-                    <line x1="1" y1="11" x2="14" y2="11"/>
-                    <circle cx="10" cy="11" r="1.75" fill="var(--panel)" stroke="currentColor"/>
+                {{ i.del }}
+            </button>
+        </template>
+
+        <!-- Normal mode actions -->
+        <template v-else>
+            <button
+                v-if="isCustomBoard"
+                class="btn ghost sm tb-edit"
+                :title="i.edit"
+                @click="$emit('enterBoardEdit')"
+            >
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                    <rect x="1" y="1" width="12" height="12" rx="2"/>
+                    <line x1="4" y1="7" x2="10" y2="7"/>
+                    <line x1="7" y1="4" x2="7" y2="10"/>
                 </svg>
+                {{ i.edit }}
             </button>
 
-            <div v-if="settingsOpen" class="settings-panel" @click.stop>
-                <div class="sp-row">
-                    <span class="sp-label">{{ i.lang }}</span>
-                    <div class="seg">
-                        <button :class="lang === 'fr' ? 'on' : ''" @click="$emit('update:lang', 'fr')">FR</button>
-                        <button :class="lang === 'en' ? 'on' : ''" @click="$emit('update:lang', 'en')">EN</button>
+            <button
+                v-if="layouts.length > 1"
+                class="btn ghost sm tb-del"
+                :title="i.del"
+                @click="$emit('deleteLayout')"
+            >
+                <svg width="12" height="13" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                    <path d="M1 3h10M4 3V2h4v1M5 6v4M7 6v4M2 3l.7 8h6.6L10 3"/>
+                </svg>
+                {{ i.del }}
+            </button>
+
+            <button
+                class="btn ghost sm legends-btn"
+                :class="showLegends ? 'active' : ''"
+                :title="t.showLegends"
+                @click="$emit('toggleLegends')"
+            >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                    <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                    <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+                    <rect x="8" y="8" width="5" height="5" rx="1"
+                        :fill="showLegends ? 'currentColor' : 'none'"
+                        stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+                {{ t.showLegends }}
+            </button>
+
+            <div ref="settingsRef" class="settings-wrap">
+                <button
+                    class="btn ghost sm settings-btn"
+                    :class="settingsOpen ? 'active' : ''"
+                    :title="lang === 'fr' ? 'Réglages' : 'Settings'"
+                    @click.stop="settingsOpen = !settingsOpen"
+                >
+                    <svg width="15" height="13" viewBox="0 0 15 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                        <line x1="1" y1="2" x2="14" y2="2"/>
+                        <circle cx="10" cy="2" r="1.75" fill="var(--panel)" stroke="currentColor"/>
+                        <line x1="1" y1="6.5" x2="14" y2="6.5"/>
+                        <circle cx="5" cy="6.5" r="1.75" fill="var(--panel)" stroke="currentColor"/>
+                        <line x1="1" y1="11" x2="14" y2="11"/>
+                        <circle cx="10" cy="11" r="1.75" fill="var(--panel)" stroke="currentColor"/>
+                    </svg>
+                </button>
+
+                <div v-if="settingsOpen" class="settings-panel" @click.stop>
+                    <div class="sp-row">
+                        <span class="sp-label">{{ i.lang }}</span>
+                        <div class="seg">
+                            <button :class="lang === 'fr' ? 'on' : ''" @click="$emit('update:lang', 'fr')">FR</button>
+                            <button :class="lang === 'en' ? 'on' : ''" @click="$emit('update:lang', 'en')">EN</button>
+                        </div>
                     </div>
-                </div>
-                <div class="sp-row">
-                    <span class="sp-label">{{ i.theme }}</span>
-                    <div class="seg">
-                        <button :class="!isDark ? 'on' : ''" @click="$emit('update:isDark', false)">☀</button>
-                        <button :class="isDark ? 'on' : ''" @click="$emit('update:isDark', true)">☾</button>
+                    <div class="sp-row">
+                        <span class="sp-label">{{ i.theme }}</span>
+                        <div class="seg">
+                            <button :class="!isDark ? 'on' : ''" @click="$emit('update:isDark', false)">☀</button>
+                            <button :class="isDark ? 'on' : ''" @click="$emit('update:isDark', true)">☾</button>
+                        </div>
                     </div>
+                    <div class="sp-divider" />
+                    <button class="sp-action" @click="triggerImport">
+                        <span class="sp-icon">↑</span>{{ i.import }}
+                    </button>
+                    <button class="sp-action" @click="triggerExport">
+                        <span class="sp-icon">↓</span>{{ i.export }}
+                    </button>
+                    <button class="sp-action accent" @click="triggerPdf">
+                        <span class="sp-icon">⎙</span>PDF
+                    </button>
                 </div>
-                <div class="sp-divider" />
-                <button class="sp-action" @click="triggerImport">
-                    <span class="sp-icon">↑</span>{{ i.import }}
-                </button>
-                <button class="sp-action" @click="triggerExport">
-                    <span class="sp-icon">↓</span>{{ i.export }}
-                </button>
-                <button class="sp-action accent" @click="triggerPdf">
-                    <span class="sp-icon">⎙</span>PDF
-                </button>
             </div>
-        </div>
+        </template>
     </div>
 
     <input ref="fileInput" type="file" accept=".json" style="display:none" @change="onFileChange" />

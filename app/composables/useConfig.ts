@@ -136,12 +136,44 @@ function applyEncoder(enc: IEncoderDef) {
 
 function onJoyClick(id: string) {
     if (picking.value) return
-    const hand = id === 'jsL' ? 'L' : 'R'
+    let hand: string
+    if (id === 'jsL') {
+        hand = 'L'
+    } else if (id === 'jsR' || id === 'jsR2') {
+        hand = 'R'
+    } else {
+        const key = board.value.keys.find(k => k.id === id)
+        hand = (key?.hand ?? 'r').toUpperCase()
+    }
+    if (!layout.value.joysticks?.[hand]) {
+        update(c => {
+            const l = curLayout(c)
+            if (!l.joysticks) l.joysticks = {}
+            l.joysticks[hand] = {
+                active: 0,
+                modes: [{
+                    id: 'default',
+                    name: { fr: 'Mode 1', en: 'Mode 1' },
+                    color: '#7c8696',
+                    dirs: {},
+                    press: { main: '●', type: 'special' },
+                }],
+            }
+        })
+    }
     modal.value = { kind: 'joystick', hand }
 }
 
 function onModeClick(id: string) {
-    const hand = id === 'mbL' ? 'L' : 'R'
+    let hand: string
+    if (id === 'mbL') {
+        hand = 'L'
+    } else if (id === 'mbR') {
+        hand = 'R'
+    } else {
+        const key = board.value.keys.find(k => k.id === id)
+        hand = (key?.hand ?? 'r').toUpperCase()
+    }
     const js = layout.value.joysticks?.[hand]
     if (!js) return
     jsModes.value = { ...jsModes.value, [hand]: ((jsModes.value[hand] ?? 0) + 1) % js.modes.length }

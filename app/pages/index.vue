@@ -298,6 +298,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
         @export="exportConfig()"
         @export-pdf="printPage"
         @enter-board-edit="enterBoardEdit"
+        @exit-board-edit="exitBoardEdit"
     />
 
     <div

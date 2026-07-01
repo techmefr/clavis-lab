@@ -32,11 +32,13 @@ function getBaseDef(pos: IKeyPos): IKeyDef | null {
 }
 
 function getJoystick(hand: string): IJoystick | null {
-    return props.joysticks?.[hand] ?? null
+    const h = hand.toUpperCase()
+    return props.joysticks?.[h] ?? props.joysticks?.[hand] ?? null
 }
 
 function getModeIdx(hand: string): number {
-    return props.jsModes[hand] ?? 0
+    const h = hand.toUpperCase()
+    return props.jsModes[h] ?? props.jsModes[hand] ?? 0
 }
 </script>
 

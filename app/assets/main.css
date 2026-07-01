@@ -93,10 +93,30 @@ button { font-family: inherit; cursor: pointer; }
     background: var(--panel);
     border-bottom: 1px solid var(--line);
     z-index: 30;
+    transition: background .15s;
+}
+.topbar-build {
+    background: var(--accent-soft);
+    border-bottom-color: oklch(from var(--accent) l c h / 0.25);
 }
 .tb-left  { display: flex; align-items: center; gap: 10px; }
 .tb-center { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .tb-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.tb-build-name {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 500; color: var(--ink);
+}
+.tb-build-label { color: var(--accent); font-weight: 700; }
+.tb-build-sep { color: var(--ink-3); }
+.tb-build-layout { color: var(--ink-2); }
+.tb-edit { display: flex; align-items: center; gap: 5px; }
+.tb-del {
+    display: flex; align-items: center; gap: 5px;
+    color: oklch(55% 0.18 27);
+    border-color: oklch(55% 0.18 27 / 0.35);
+}
+.tb-del:hover { background: oklch(97% 0.008 27); border-color: oklch(55% 0.18 27); }
+[data-theme="dark"] .tb-del:hover { background: oklch(22% 0.025 27); }
 .brand .logo { font-weight: 600; font-size: 15px; letter-spacing: .3px; }
 .brand .logo b { color: var(--accent); font-weight: 700; }
 /* layout picker */
