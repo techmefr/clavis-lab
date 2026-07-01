@@ -66,6 +66,10 @@ function isActiveStamp(s: StampDef): boolean {
     return !!t && t.kind === s.kind && t.w === s.w && t.h === s.h
 }
 
+function onStampClick(s: StampDef) {
+    emit('stamp', isActiveStamp(s) ? null : { kind: s.kind, w: s.w, h: s.h })
+}
+
 const isResizable = computed(() =>
     selPos.value?.kind === 'matrix' || selPos.value?.kind === 'thumb' || selPos.value?.kind === 'trackball'
 )
@@ -88,7 +92,7 @@ const isResizable = computed(() =>
                 :key="`${s.kind}-${s.w}-${s.h}`"
                 :class="['bs-stamp', isActiveStamp(s) ? 'active' : '']"
                 :title="s.label"
-                @click="$emit('stamp', { kind: s.kind, w: s.w, h: s.h })"
+                @click="onStampClick(s)"
             >
                 <svg :width="s.pw + 8" :height="s.ph + 8" viewBox="0 0 100 100" preserveAspectRatio="none">
                     <rect
