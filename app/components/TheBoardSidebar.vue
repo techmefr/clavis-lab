@@ -70,7 +70,7 @@ const FINGERS = [
 
 const isResizable = computed(() => {
     const k = selPos.value?.kind
-    return k === 'matrix' || k === 'thumb' || k === 'trackball'
+    return k === 'joystick' || k === 'trackball'
 })
 
 function isActiveStamp(s: StampDef): boolean {

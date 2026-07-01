@@ -254,6 +254,32 @@ select.sel:focus, input.txt:focus { border-color: var(--accent); }
 .sel-handle.tr { top: 0;    left: 100%; }
 .sel-handle.bl { top: 100%; left: 0; }
 .sel-handle.br { top: 100%; left: 100%; }
+.sel-handle.resize { font-size: 0; background: var(--panel); }
+.sel-handle.resize.tl { cursor: nw-resize; }
+.sel-handle.resize.tr { cursor: ne-resize; }
+.sel-handle.resize.bl { cursor: sw-resize; }
+.sel-handle.resize.br { cursor: se-resize; }
+.sel-rot-handle {
+    position: absolute;
+    top: -34px; left: 50%;
+    transform: translateX(-50%);
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--accent); background: var(--panel);
+    color: var(--accent); font-size: 11px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    cursor: crosshair; pointer-events: all; user-select: none;
+    transition: background .1s, color .1s;
+}
+.sel-rot-handle::before {
+    content: '';
+    position: absolute; bottom: 100%; left: 50%;
+    width: 1px; height: 10px;
+    background: var(--accent); opacity: .5;
+    transform: translateX(-50%);
+}
+.sel-rot-handle:hover { background: var(--accent); color: var(--panel); }
+.stage.resizing { cursor: crosshair !important; }
+.stage.resizing .key { cursor: crosshair !important; }
 .bs-header {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     padding: 12px 14px; border-bottom: 1px solid var(--line);

@@ -7,7 +7,7 @@ const {
     boardEditMode, boardSelKey, isCustomBoard, stampTool,
     enterBoardEdit, exitBoardEdit, setStamp,
     addKeyToBoard, deleteBoardKey, duplicateBoardKey, moveBoardKey, rotateBoardKey,
-    setKeyPosition, setKeyAbsRotation,
+    setKeyPosition, setKeyAbsRotation, setKeyRect,
     setBoardKeyFinger, setBoardKeyKind, setBoardKeySize,
     activeLayoutId, activeLayerId, selKey,
     picking, modal, toast, jsModes, t,
@@ -38,13 +38,19 @@ const FINGERS = ['lp', 'lr', 'lm', 'li', 'ri', 'rm', 'rr', 'rp', 'th', 'enc']
 function printPage() { window.print() }
 
 const UNIT = 64
+const RESIZABLE_KINDS = new Set<string>(['joystick', 'trackball'])
 
-interface DragState { id: string; offsetX: number; offsetY: number }
+interface DragState   { id: string; offsetX: number; offsetY: number }
 interface RotateState { id: string; cx: number; cy: number; startAngle: number; startRot: number }
+type ResizeCorner = 'tl' | 'tr' | 'bl' | 'br'
+interface ResizeState { id: string; corner: ResizeCorner; anchorX: number; anchorY: number }
 
-const dragState = ref<DragState | null>(null)
+const dragState   = ref<DragState | null>(null)
 const rotateState = ref<RotateState | null>(null)
+const resizeState = ref<ResizeState | null>(null)
 let dragMoved = false
+
+const selResizable = computed(() => RESIZABLE_KINDS.has(selPos.value?.kind ?? ''))
 
 function clientToBoard(cx: number, cy: number): { bx: number; by: number } {
     const rect = stageRef.value!.getBoundingClientRect()
@@ -57,6 +63,23 @@ function clientToBoard(cx: number, cy: number): { bx: number; by: number } {
 function onBoardMousedown(e: MouseEvent) {
     if (!boardEditMode.value) return
     const target = e.target as HTMLElement
+
+    const resizeHandle = target.closest('[data-resize-id]') as HTMLElement | null
+    if (resizeHandle) {
+        e.preventDefault()
+        e.stopPropagation()
+        const id = resizeHandle.getAttribute('data-resize-id')!
+        const corner = resizeHandle.getAttribute('data-resize-corner') as ResizeCorner
+        const key = board.value.keys.find(k => k.id === id)
+        if (!key) return
+        const w = key.w ?? 1
+        const h = key.h ?? 1
+        const anchorX = (corner === 'tl' || corner === 'bl') ? key.x + w : key.x
+        const anchorY = (corner === 'tl' || corner === 'tr') ? key.y + h : key.y
+        resizeState.value = { id, corner, anchorX, anchorY }
+        dragMoved = true
+        return
+    }
 
     const rotHandle = target.closest('[data-rotate-id]') as HTMLElement | null
     if (rotHandle) {
@@ -100,15 +123,49 @@ function onBoardMousemove(e: MouseEvent) {
         const delta = angle - rotateState.value.startAngle
         setKeyAbsRotation(rotateState.value.id, Math.round((rotateState.value.startRot + delta) / 5) * 5)
     }
+    if (resizeState.value) {
+        const rs = resizeState.value
+        const { bx, by } = clientToBoard(e.clientX, e.clientY)
+        const snap = (v: number) => Math.round(v * 2) / 2
+        const bxU = bx / UNIT
+        const byU = by / UNIT
+        let newX: number, newY: number, newW: number, newH: number
+        switch (rs.corner) {
+            case 'br':
+                newW = Math.max(1, snap(bxU - rs.anchorX))
+                newH = Math.max(1, snap(byU - rs.anchorY))
+                newX = rs.anchorX; newY = rs.anchorY
+                break
+            case 'tl':
+                newW = Math.max(1, snap(rs.anchorX - bxU))
+                newH = Math.max(1, snap(rs.anchorY - byU))
+                newX = rs.anchorX - newW; newY = rs.anchorY - newH
+                break
+            case 'tr':
+                newW = Math.max(1, snap(bxU - rs.anchorX))
+                newH = Math.max(1, snap(rs.anchorY - byU))
+                newX = rs.anchorX; newY = rs.anchorY - newH
+                break
+            case 'bl':
+                newW = Math.max(1, snap(rs.anchorX - bxU))
+                newH = Math.max(1, snap(byU - rs.anchorY))
+                newX = rs.anchorX - newW; newY = rs.anchorY
+                break
+            default: return
+        }
+        setKeyRect(rs.id, Math.max(0, newX), Math.max(0, newY), newW, newH)
+    }
 }
 
 function onBoardMouseup() {
     dragState.value = null
     rotateState.value = null
+    resizeState.value = null
 }
 
-const isDragging = computed(() => dragState.value !== null || rotateState.value !== null)
+const isDragging = computed(() => dragState.value !== null || rotateState.value !== null || resizeState.value !== null)
 const isRotating = computed(() => rotateState.value !== null)
+const isResizing = computed(() => resizeState.value !== null)
 
 interface CtxMenu { x: number; y: number; id: string }
 const ctxMenu = ref<CtxMenu | null>(null)
@@ -246,7 +303,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
     <div
         ref="stageRef"
         class="stage"
-        :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '', isRotating ? 'rotating' : '']"
+        :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '', isRotating ? 'rotating' : '', isResizing ? 'resizing' : '']"
         @click="onStageClick"
         @contextmenu="onStageContextmenu"
         @mousedown="onBoardMousedown"
@@ -308,10 +365,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
                 }"
             >
                 <div class="sel-outline" />
-                <div class="sel-handle tl" :data-rotate-id="selPos.id">↺</div>
-                <div class="sel-handle tr" :data-rotate-id="selPos.id">↻</div>
-                <div class="sel-handle bl" :data-rotate-id="selPos.id">↻</div>
-                <div class="sel-handle br" :data-rotate-id="selPos.id">↺</div>
+
+                <template v-if="selResizable">
+                    <div class="sel-rot-handle" :data-rotate-id="selPos.id">↺</div>
+                    <div class="sel-handle resize tl" :data-resize-id="selPos.id" data-resize-corner="tl" />
+                    <div class="sel-handle resize tr" :data-resize-id="selPos.id" data-resize-corner="tr" />
+                    <div class="sel-handle resize bl" :data-resize-id="selPos.id" data-resize-corner="bl" />
+                    <div class="sel-handle resize br" :data-resize-id="selPos.id" data-resize-corner="br" />
+                </template>
+                <template v-else>
+                    <div class="sel-handle tl" :data-rotate-id="selPos.id">↺</div>
+                    <div class="sel-handle tr" :data-rotate-id="selPos.id">↻</div>
+                    <div class="sel-handle bl" :data-rotate-id="selPos.id">↻</div>
+                    <div class="sel-handle br" :data-rotate-id="selPos.id">↺</div>
+                </template>
             </div>
         </div>
 

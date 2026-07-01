@@ -383,6 +383,18 @@ function setKeyPosition(id: string, x: number, y: number) {
     })
 }
 
+function setKeyRect(id: string, x: number, y: number, w: number, h: number) {
+    updateBoardDef(b => {
+        const k = b.keys.find(k => k.id === id)
+        if (!k) return
+        k.x = Math.max(0, x)
+        k.y = Math.max(0, y)
+        k.w = w !== 1 ? w : undefined
+        k.h = h !== 1 ? h : undefined
+        recalcBoardSize(b)
+    })
+}
+
 function rotateBoardKey(id: string, deg: number) {
     updateBoardDef(b => {
         const k = b.keys.find(x => x.id === id)
@@ -455,6 +467,7 @@ export function useConfig() {
         duplicateBoardKey,
         moveBoardKey,
         setKeyPosition,
+        setKeyRect,
         rotateBoardKey,
         setKeyAbsRotation,
         setBoardKeyFinger,
