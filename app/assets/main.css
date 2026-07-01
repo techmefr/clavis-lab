@@ -214,13 +214,20 @@ select.sel:focus, input.txt:focus { border-color: var(--accent); }
 
 /* ---- Board builder sidebar ---- */
 .stage.edit-mode { cursor: crosshair; }
-.stage.edit-mode .key { cursor: pointer; }
-.stage.edit-mode .key:not(.selected):hover { outline: 2px solid oklch(from var(--accent) l c h / 0.5); outline-offset: 2px; border-radius: 8px; }
-.stage.edit-mode .key.selected { cursor: grab; }
+.stage.edit-mode .key,
+.stage.edit-mode .joystick { cursor: pointer; }
+.stage.edit-mode .key:not(.selected):hover,
+.stage.edit-mode .joystick:not(.selected):hover { outline: 2px solid oklch(from var(--accent) l c h / 0.5); outline-offset: 2px; border-radius: 8px; }
+.stage.edit-mode .key.selected,
+.stage.edit-mode .joystick.selected { cursor: grab; }
 .stage.dragging { cursor: grabbing !important; }
-.stage.dragging .key { cursor: grabbing !important; }
+.stage.dragging .key,
+.stage.dragging .joystick { cursor: grabbing !important; }
 .stage.rotating { cursor: crosshair !important; }
-.stage.rotating .key { cursor: crosshair !important; }
+.stage.rotating .key,
+.stage.rotating .joystick { cursor: crosshair !important; }
+.stage.resizing .key,
+.stage.resizing .joystick { cursor: crosshair !important; }
 .board-sidebar {
     position: absolute; left: 0; top: 0; bottom: 0; width: 220px; z-index: 45;
     display: flex; flex-direction: column;

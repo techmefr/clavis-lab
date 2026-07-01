@@ -348,8 +348,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
                 :js-modes="jsModes"
                 :t="t"
                 @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
-                @joy-click="onJoyClick"
-                @mode-click="onModeClick"
+                @joy-click="boardEditMode ? onBoardKeyClick($event) : onJoyClick($event)"
+                @mode-click="boardEditMode ? onBoardKeyClick($event) : onModeClick($event)"
             />
 
             <div
