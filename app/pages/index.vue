@@ -6,7 +6,7 @@ const {
     config, lang, isDark,
     boardEditMode, boardSelKey, isCustomBoard, stampTool,
     enterBoardEdit, exitBoardEdit, setStamp,
-    addKeyToBoard, deleteBoardKey, moveBoardKey, rotateBoardKey,
+    addKeyToBoard, deleteBoardKey, duplicateBoardKey, moveBoardKey, rotateBoardKey,
     setKeyPosition, setKeyAbsRotation,
     setBoardKeyFinger, setBoardKeyKind, setBoardKeySize,
     activeLayoutId, activeLayerId, selKey,
@@ -108,6 +108,12 @@ function onBoardMouseup() {
 }
 
 const isDragging = computed(() => dragState.value !== null || rotateState.value !== null)
+const isRotating = computed(() => rotateState.value !== null)
+
+interface CtxMenu { x: number; y: number; id: string }
+const ctxMenu = ref<CtxMenu | null>(null)
+
+function closeCtxMenu() { ctxMenu.value = null }
 
 function onBoardKeyClick(id: string) {
     boardSelKey.value = id
@@ -116,6 +122,7 @@ function onBoardKeyClick(id: string) {
 
 function onStageClick(e: MouseEvent) {
     if (!boardEditMode.value || !stageRef.value) return
+    closeCtxMenu()
     if (dragMoved) { dragMoved = false; return }
     const target = e.target as HTMLElement
     if (target.closest('[data-key-id]') || target.closest('.board-sidebar')) return
@@ -139,6 +146,78 @@ function onStageClick(e: MouseEvent) {
     if (gx < 0 || gy < 0 || gx > 24 || gy > 18) return
     addKeyToBoard(gx, gy)
 }
+
+function onStageContextmenu(e: MouseEvent) {
+    if (!boardEditMode.value) return
+    e.preventDefault()
+    const target = e.target as HTMLElement
+    const keyEl = target.closest('[data-key-id]') as HTMLElement | null
+    if (!keyEl || target.closest('.board-sidebar')) return
+    const id = keyEl.getAttribute('data-key-id')!
+    boardSelKey.value = id
+    selKey.value = id
+    ctxMenu.value = { x: e.clientX, y: e.clientY, id }
+}
+
+function ctxDuplicate() {
+    if (!ctxMenu.value) return
+    const newId = duplicateBoardKey(ctxMenu.value.id)
+    if (newId) { boardSelKey.value = newId; selKey.value = newId }
+    closeCtxMenu()
+}
+
+function ctxDelete() {
+    if (!ctxMenu.value) return
+    deleteBoardKey(ctxMenu.value.id)
+    closeCtxMenu()
+}
+
+function ctxRotate(deg: number) {
+    if (!ctxMenu.value) return
+    rotateBoardKey(ctxMenu.value.id, deg)
+}
+
+function onKeyboardShortcut(e: KeyboardEvent) {
+    if (!boardEditMode.value) return
+    const id = boardSelKey.value
+
+    if (e.key === 'Escape') {
+        if (ctxMenu.value) { closeCtxMenu(); return }
+        if (id) { boardSelKey.value = null; selKey.value = null }
+        else exitBoardEdit()
+        return
+    }
+
+    if (!id) return
+    const step = e.shiftKey ? 0.25 : 1
+    const key = board.value.keys.find(k => k.id === id)
+    if (!key) return
+
+    switch (e.key) {
+        case 'ArrowLeft':  e.preventDefault(); setKeyPosition(id, key.x - step, key.y); break
+        case 'ArrowRight': e.preventDefault(); setKeyPosition(id, key.x + step, key.y); break
+        case 'ArrowUp':    e.preventDefault(); setKeyPosition(id, key.x, key.y - step); break
+        case 'ArrowDown':  e.preventDefault(); setKeyPosition(id, key.x, key.y + step); break
+        case '[':          rotateBoardKey(id, -15); break
+        case ']':          rotateBoardKey(id, 15);  break
+        case 'Delete':
+        case 'Backspace':
+            if (!(e.target as HTMLElement).matches('input, textarea')) {
+                deleteBoardKey(id)
+            }
+            break
+        case 'd':
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault()
+                const newId = duplicateBoardKey(id)
+                if (newId) { boardSelKey.value = newId; selKey.value = newId }
+            }
+            break
+    }
+}
+
+onMounted(() => window.addEventListener('keydown', onKeyboardShortcut))
+onUnmounted(() => window.removeEventListener('keydown', onKeyboardShortcut))
 </script>
 
 <template>
@@ -167,8 +246,9 @@ function onStageClick(e: MouseEvent) {
     <div
         ref="stageRef"
         class="stage"
-        :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '']"
+        :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '', isRotating ? 'rotating' : '']"
         @click="onStageClick"
+        @contextmenu="onStageContextmenu"
         @mousedown="onBoardMousedown"
         @mousemove="onBoardMousemove"
         @mouseup="onBoardMouseup"
@@ -228,10 +308,10 @@ function onStageClick(e: MouseEvent) {
                 }"
             >
                 <div class="sel-outline" />
-                <div class="sel-handle tl" :data-rotate-id="selPos.id" />
-                <div class="sel-handle tr" :data-rotate-id="selPos.id" />
-                <div class="sel-handle bl" :data-rotate-id="selPos.id" />
-                <div class="sel-handle br" :data-rotate-id="selPos.id" />
+                <div class="sel-handle tl" :data-rotate-id="selPos.id">↺</div>
+                <div class="sel-handle tr" :data-rotate-id="selPos.id">↻</div>
+                <div class="sel-handle bl" :data-rotate-id="selPos.id">↻</div>
+                <div class="sel-handle br" :data-rotate-id="selPos.id">↺</div>
             </div>
         </div>
 
@@ -318,5 +398,25 @@ function onStageClick(e: MouseEvent) {
 
 <Teleport to="body">
     <ThePrintView :layout="layout" :lang="lang" :show-legends="config.showLegends" />
+</Teleport>
+
+<Teleport to="body">
+    <div
+        v-if="ctxMenu"
+        class="ctx-backdrop"
+        @click="closeCtxMenu"
+        @contextmenu.prevent="closeCtxMenu"
+    />
+    <div
+        v-if="ctxMenu"
+        class="ctx-menu"
+        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+    >
+        <button class="ctx-item" @click="ctxRotate(-15); closeCtxMenu()">Rotation -15°</button>
+        <button class="ctx-item" @click="ctxRotate(15); closeCtxMenu()">Rotation +15°</button>
+        <div class="ctx-sep" />
+        <button class="ctx-item" @click="ctxDuplicate">Dupliquer</button>
+        <button class="ctx-item danger" @click="ctxDelete">Supprimer</button>
+    </div>
 </Teleport>
 </template>

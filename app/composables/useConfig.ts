@@ -397,6 +397,19 @@ function setKeyAbsRotation(id: string, deg: number) {
     })
 }
 
+function duplicateBoardKey(id: string): string | null {
+    if (!isCustomBoard.value) return null
+    const newId = 'k' + Date.now()
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        b.keys.push({ ...k, id: newId, x: k.x + 1, y: k.y + 1 })
+        b.matrixIds = b.keys.filter(x => x.kind !== 'encoder').map(x => x.id)
+        recalcBoardSize(b)
+    })
+    return newId
+}
+
 function setBoardKeyFinger(id: string, finger: string) {
     updateBoardDef(b => {
         const k = b.keys.find(x => x.id === id)
@@ -439,6 +452,7 @@ export function useConfig() {
         setStamp,
         addKeyToBoard,
         deleteBoardKey,
+        duplicateBoardKey,
         moveBoardKey,
         setKeyPosition,
         rotateBoardKey,
