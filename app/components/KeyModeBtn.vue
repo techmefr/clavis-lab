@@ -16,6 +16,7 @@ defineEmits<{
 <template>
 <div
     class="key modebtn"
+    :data-key-id="pos.id"
     :style="{
         left: pos.x * 64 + 'px',
         top: pos.y * 64 + 'px',

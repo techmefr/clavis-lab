@@ -265,7 +265,7 @@ select.sel:focus, input.txt:focus { border-color: var(--accent); }
 .bs-header .btn { background: oklch(98% 0.005 152 / 0.15); border-color: oklch(98% 0.005 152 / 0.3); color: oklch(98% 0.005 152); font-size: 11.5px; padding: 4px 9px; }
 .bs-header .btn:hover { background: oklch(98% 0.005 152 / 0.3); border-color: oklch(98% 0.005 152 / 0.5); }
 .bs-section { padding: 12px 14px; }
-.bs-sep { height: 1px; background: var(--line); margin: 0 -14px 12px; }
+.bs-sep { height: 1px; background: var(--line); margin: 0; }
 .bs-sl { font-size: 9.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; margin-bottom: 8px; }
 .bs-stamps { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 8px; }
 .bs-stamp {

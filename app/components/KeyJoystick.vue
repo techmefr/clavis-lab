@@ -33,6 +33,7 @@ function isTransDir(d: string): boolean {
 <template>
 <div
     :class="['joystick', selected ? 'selected' : '']"
+    :data-key-id="pos.id"
     :style="{
         left: pos.x * 64 + 'px',
         top: pos.y * 64 + 'px',
