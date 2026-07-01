@@ -251,7 +251,7 @@ function newLayout(name: string, mode: string) {
     activeLayoutId.value = id
     activeLayerId.value = 'base'
     modal.value = null
-    if (mode === 'whiteboard') boardEditMode.value = true
+    if (mode === 'whiteboard') enterBoardEdit()
 }
 
 function deleteLayout() {
@@ -368,8 +368,17 @@ function moveBoardKey(id: string, dx: number, dy: number) {
         const nx = k.x + dx
         const ny = k.y + dy
         if (nx < 0 || ny < 0) return
-        if (b.keys.find(x => x.id !== id && x.x === nx && x.y === ny)) return
         k.x = nx; k.y = ny
+        recalcBoardSize(b)
+    })
+}
+
+function setKeyPosition(id: string, x: number, y: number) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (!k) return
+        k.x = Math.max(0, x)
+        k.y = Math.max(0, y)
         recalcBoardSize(b)
     })
 }
@@ -378,6 +387,13 @@ function rotateBoardKey(id: string, deg: number) {
     updateBoardDef(b => {
         const k = b.keys.find(x => x.id === id)
         if (k) k.rot = ((k.rot ?? 0) + deg + 360) % 360
+    })
+}
+
+function setKeyAbsRotation(id: string, deg: number) {
+    updateBoardDef(b => {
+        const k = b.keys.find(x => x.id === id)
+        if (k) k.rot = ((deg % 360) + 360) % 360
     })
 }
 
@@ -424,7 +440,9 @@ export function useConfig() {
         addKeyToBoard,
         deleteBoardKey,
         moveBoardKey,
+        setKeyPosition,
         rotateBoardKey,
+        setKeyAbsRotation,
         setBoardKeyFinger,
         setBoardKeyKind,
         setBoardKeySize,

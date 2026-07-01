@@ -7,6 +7,7 @@ const {
     boardEditMode, boardSelKey, isCustomBoard, stampTool,
     enterBoardEdit, exitBoardEdit, setStamp,
     addKeyToBoard, deleteBoardKey, moveBoardKey, rotateBoardKey,
+    setKeyPosition, setKeyAbsRotation,
     setBoardKeyFinger, setBoardKeyKind, setBoardKeySize,
     activeLayoutId, activeLayerId, selKey,
     picking, modal, toast, jsModes, t,
@@ -24,7 +25,7 @@ const {
 const stageRef = ref<HTMLElement | null>(null)
 const boardW = computed(() => board.value.widthPx)
 const boardH = computed(() => board.value.heightPx + 30)
-const { scale } = useFit(stageRef, boardW, boardH, boardEditMode.value ? 80 : 150)
+const { scale } = useFit(stageRef, boardW, boardH, 150)
 
 const selPos = computed(() => selKey.value ? board.value.keys.find(k => k.id === selKey.value) ?? null : null)
 const triggerIds = computed(() => {
@@ -36,15 +37,94 @@ const FINGERS = ['lp', 'lr', 'lm', 'li', 'ri', 'rm', 'rr', 'rp', 'th', 'enc']
 
 function printPage() { window.print() }
 
+const UNIT = 64
+
+interface DragState { id: string; offsetX: number; offsetY: number }
+interface RotateState { id: string; cx: number; cy: number; startAngle: number; startRot: number }
+
+const dragState = ref<DragState | null>(null)
+const rotateState = ref<RotateState | null>(null)
+let dragMoved = false
+
+function clientToBoard(cx: number, cy: number): { bx: number; by: number } {
+    const rect = stageRef.value!.getBoundingClientRect()
+    const s = scale.value
+    const ox = (rect.width  - board.value.widthPx  * s) / 2
+    const oy = (rect.height - board.value.heightPx * s) / 2
+    return { bx: (cx - rect.left - ox) / s, by: (cy - rect.top - oy) / s }
+}
+
+function onBoardMousedown(e: MouseEvent) {
+    if (!boardEditMode.value) return
+    const target = e.target as HTMLElement
+
+    const rotHandle = target.closest('[data-rotate-id]') as HTMLElement | null
+    if (rotHandle) {
+        e.preventDefault()
+        e.stopPropagation()
+        const id = rotHandle.getAttribute('data-rotate-id')!
+        const key = board.value.keys.find(k => k.id === id)
+        if (!key) return
+        const cx = (key.x + (key.w ?? 1) / 2) * UNIT
+        const cy = (key.y + (key.h ?? 1) / 2) * UNIT
+        const { bx, by } = clientToBoard(e.clientX, e.clientY)
+        rotateState.value = { id, cx, cy, startAngle: Math.atan2(by - cy, bx - cx) * 180 / Math.PI, startRot: key.rot ?? 0 }
+        return
+    }
+
+    const keyEl = target.closest('[data-key-id]') as HTMLElement | null
+    if (keyEl && !target.closest('.board-sidebar')) {
+        e.preventDefault()
+        const id = keyEl.getAttribute('data-key-id')!
+        boardSelKey.value = id
+        selKey.value = id
+        const key = board.value.keys.find(k => k.id === id)
+        if (!key) return
+        const { bx, by } = clientToBoard(e.clientX, e.clientY)
+        dragState.value = { id, offsetX: bx - key.x * UNIT, offsetY: by - key.y * UNIT }
+        dragMoved = false
+    }
+}
+
+function onBoardMousemove(e: MouseEvent) {
+    if (dragState.value) {
+        dragMoved = true
+        const { bx, by } = clientToBoard(e.clientX, e.clientY)
+        const rawX = (bx - dragState.value.offsetX) / UNIT
+        const rawY = (by - dragState.value.offsetY) / UNIT
+        setKeyPosition(dragState.value.id, Math.round(rawX * 4) / 4, Math.round(rawY * 4) / 4)
+    }
+    if (rotateState.value) {
+        const { bx, by } = clientToBoard(e.clientX, e.clientY)
+        const angle = Math.atan2(by - rotateState.value.cy, bx - rotateState.value.cx) * 180 / Math.PI
+        const delta = angle - rotateState.value.startAngle
+        setKeyAbsRotation(rotateState.value.id, Math.round((rotateState.value.startRot + delta) / 5) * 5)
+    }
+}
+
+function onBoardMouseup() {
+    dragState.value = null
+    rotateState.value = null
+}
+
+const isDragging = computed(() => dragState.value !== null || rotateState.value !== null)
+
 function onBoardKeyClick(id: string) {
-    boardSelKey.value = boardSelKey.value === id ? null : id
+    boardSelKey.value = id
     selKey.value = id
 }
 
 function onStageClick(e: MouseEvent) {
-    if (!boardEditMode.value || !stageRef.value || !stampTool.value) return
+    if (!boardEditMode.value || !stageRef.value) return
+    if (dragMoved) { dragMoved = false; return }
     const target = e.target as HTMLElement
-    if (target.closest('.key') || target.closest('.joystick')) return
+    if (target.closest('[data-key-id]') || target.closest('.board-sidebar')) return
+
+    if (!stampTool.value) {
+        boardSelKey.value = null
+        selKey.value = null
+        return
+    }
 
     const rect = stageRef.value.getBoundingClientRect()
     const s = scale.value
@@ -54,8 +134,8 @@ function onStageClick(e: MouseEvent) {
     const bx = (e.clientX - rect.left  - originX) / s
     const by = (e.clientY - rect.top   - originY) / s
 
-    const gx = Math.floor(bx / 64)
-    const gy = Math.floor(by / 64)
+    const gx = Math.floor(bx / UNIT)
+    const gy = Math.floor(by / UNIT)
     if (gx < 0 || gy < 0 || gx > 24 || gy > 18) return
     addKeyToBoard(gx, gy)
 }
@@ -84,7 +164,16 @@ function onStageClick(e: MouseEvent) {
         @enter-board-edit="enterBoardEdit"
     />
 
-    <div class="app-main">
+    <div
+        ref="stageRef"
+        class="stage"
+        :class="[boardEditMode ? 'edit-mode' : '', isDragging ? 'dragging' : '']"
+        @click="onStageClick"
+        @mousedown="onBoardMousedown"
+        @mousemove="onBoardMousemove"
+        @mouseup="onBoardMouseup"
+        @mouseleave="onBoardMouseup"
+    >
         <TheBoardSidebar
             v-if="boardEditMode"
             :board="board"
@@ -95,7 +184,6 @@ function onStageClick(e: MouseEvent) {
             :t="t"
             @exit="exitBoardEdit"
             @stamp="setStamp"
-            @move="(id, dx, dy) => moveBoardKey(id, dx, dy)"
             @rotate="(id, deg) => rotateBoardKey(id, deg)"
             @set-finger="(id, f) => setBoardKeyFinger(id, f)"
             @set-kind="(id, k) => setBoardKeyKind(id, k)"
@@ -103,87 +191,97 @@ function onStageClick(e: MouseEvent) {
             @delete="deleteBoardKey"
         />
 
-        <div
-            ref="stageRef"
-            class="stage"
-            :class="boardEditMode ? 'edit-mode' : ''"
-            @click="onStageClick"
-        >
-            <div v-if="!boardEditMode" class="layer-banner">
-                <span class="dot" :style="{ background: layer.color }" />
-                <span class="name">{{ layer.name[lang] ?? layer.name.fr }}</span>
-                <span v-if="layer.id !== 'base'" class="trig">
-                    {{ t.trigger }}: {{ layer.trigger.label[lang] ?? layer.trigger.label.fr ?? '—' }}
-                </span>
+        <div v-if="!boardEditMode" class="layer-banner">
+            <span class="dot" :style="{ background: layer.color }" />
+            <span class="name">{{ layer.name[lang] ?? layer.name.fr }}</span>
+            <span v-if="layer.id !== 'base'" class="trig">
+                {{ t.trigger }}: {{ layer.trigger.label[lang] ?? layer.trigger.label.fr ?? '—' }}
+            </span>
+        </div>
+
+        <div class="board-wrap" :style="{ transform: `scale(${scale})` }">
+            <TheKeyboard
+                :board="board"
+                :layer="layer"
+                :base-layer="baseLayer"
+                :show-legends="config.showLegends && !boardEditMode"
+                :selected-id="boardEditMode ? boardSelKey : selKey"
+                :trigger-ids="boardEditMode ? [] : triggerIds"
+                :joysticks="layout.joysticks ?? null"
+                :js-modes="jsModes"
+                :t="t"
+                @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
+                @joy-click="onJoyClick"
+                @mode-click="onModeClick"
+            />
+
+            <div
+                v-if="boardEditMode && selPos"
+                class="sel-overlay"
+                :style="{
+                    left: selPos.x * UNIT + 'px',
+                    top:  selPos.y * UNIT + 'px',
+                    width:  (selPos.w ?? 1) * UNIT + 'px',
+                    height: (selPos.h ?? 1) * UNIT + 'px',
+                    transform: selPos.rot ? `rotate(${selPos.rot}deg)` : undefined,
+                    transformOrigin: '50% 50%',
+                }"
+            >
+                <div class="sel-outline" />
+                <div class="sel-handle tl" :data-rotate-id="selPos.id" />
+                <div class="sel-handle tr" :data-rotate-id="selPos.id" />
+                <div class="sel-handle bl" :data-rotate-id="selPos.id" />
+                <div class="sel-handle br" :data-rotate-id="selPos.id" />
             </div>
+        </div>
 
-            <div class="board-wrap" :style="{ transform: `scale(${scale})` }">
-                <TheKeyboard
-                    :board="board"
-                    :layer="layer"
-                    :base-layer="baseLayer"
-                    :show-legends="config.showLegends && !boardEditMode"
-                    :selected-id="boardEditMode ? boardSelKey : selKey"
-                    :trigger-ids="boardEditMode ? [] : triggerIds"
-                    :joysticks="layout.joysticks ?? null"
-                    :js-modes="jsModes"
-                    :t="t"
-                    @key-click="boardEditMode ? onBoardKeyClick($event) : onKeyClick($event)"
-                    @joy-click="onJoyClick"
-                    @mode-click="onModeClick"
-                />
-            </div>
+        <template v-if="!boardEditMode">
+            <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
 
-            <template v-if="!boardEditMode">
-                <div class="hint-tip">{{ picking ? t.pickTrigger : t.keyHint }}</div>
-
-                <div class="flegend">
-                    <div class="ft">{{ t.fingers }}</div>
-                    <div class="fl-grid">
-                        <div v-for="f in FINGERS" :key="f" class="fi">
-                            <span class="sw" :style="{ background: `var(--f-${f})` }" />
-                            {{ t.fingerNames[f] }}
-                        </div>
+            <div class="flegend">
+                <div class="ft">{{ t.fingers }}</div>
+                <div class="fl-grid">
+                    <div v-for="f in FINGERS" :key="f" class="fi">
+                        <span class="sw" :style="{ background: `var(--f-${f})` }" />
+                        {{ t.fingerNames[f] }}
                     </div>
                 </div>
+            </div>
 
-                <div v-if="picking" class="trigbar">
-                    <span>{{ t.pickTrigger }}</span>
-                    <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
-                    <button class="btn" @click="donePicking()">{{ t.done }}</button>
-                </div>
+            <div v-if="picking" class="trigbar">
+                <span>{{ t.pickTrigger }}</span>
+                <span class="keys mono">{{ picking.keys.length ? picking.keys.join(' + ') : '—' }}</span>
+                <button class="btn" @click="donePicking()">{{ t.done }}</button>
+            </div>
 
-                <TheKeyEditor
-                    v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
-                    :key="selKey ?? ''"
-                    :pos="selPos"
-                    :def="layer.keys[selKey!] ?? null"
-                    :base="baseLayer.keys[selKey!] ?? null"
-                    :is-base-layer="layer.id === 'base'"
-                    :t="t"
-                    @apply="applyKey"
-                    @clear="clearKey"
-                    @close="selKey = null"
-                />
-            </template>
+            <TheKeyEditor
+                v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+                :key="selKey ?? ''"
+                :pos="selPos"
+                :def="layer.keys[selKey!] ?? null"
+                :base="baseLayer.keys[selKey!] ?? null"
+                :is-base-layer="layer.id === 'base'"
+                :t="t"
+                @apply="applyKey"
+                @clear="clearKey"
+                @close="selKey = null"
+            />
+        </template>
 
-            <template v-if="boardEditMode">
-                <TheKeyEditor
-                    v-if="selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
-                    :key="selKey ?? ''"
-                    :pos="selPos"
-                    :def="layer.keys[selKey!] ?? null"
-                    :base="baseLayer.keys[selKey!] ?? null"
-                    :is-base-layer="layer.id === 'base'"
-                    :t="t"
-                    @apply="applyKey"
-                    @clear="clearKey"
-                    @close="selKey = null; boardSelKey = null"
-                />
-            </template>
+        <TheKeyEditor
+            v-if="boardEditMode && selPos && (selPos.kind === 'matrix' || selPos.kind === 'thumb')"
+            :key="selKey ?? ''"
+            :pos="selPos"
+            :def="layer.keys[selKey!] ?? null"
+            :base="baseLayer.keys[selKey!] ?? null"
+            :is-base-layer="layer.id === 'base'"
+            :t="t"
+            @apply="applyKey"
+            @clear="clearKey"
+            @close="selKey = null; boardSelKey = null"
+        />
 
-            <div :class="['toast', toast ? 'show' : '']">{{ toast }}</div>
-        </div>
+        <div :class="['toast', toast ? 'show' : '']">{{ toast }}</div>
     </div>
 
     <TheLayerRail

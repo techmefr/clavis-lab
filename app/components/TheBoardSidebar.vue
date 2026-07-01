@@ -15,7 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{
     exit: []
     stamp: [tool: StampTool]
-    move: [id: string, dx: number, dy: number]
     rotate: [id: string, deg: number]
     setFinger: [id: string, finger: string]
     setKind: [id: string, kind: IKeyPos['kind']]
@@ -148,23 +147,14 @@ const isResizable = computed(() =>
             <button class="btn ghost sm" @click="$emit('rotate', selPos.id, 45)">+45°</button>
         </div>
 
-        <div class="bs-sl" style="margin-top: 10px">{{ lang === 'fr' ? 'Position' : 'Move' }}</div>
-        <div class="be-arrows">
-            <button class="btn ghost sm" @click="$emit('move', selPos.id, 0, -1)">↑</button>
-            <div class="be-arh">
-                <button class="btn ghost sm" @click="$emit('move', selPos.id, -1, 0)">←</button>
-                <button class="btn ghost sm" @click="$emit('move', selPos.id, 1, 0)">→</button>
-            </div>
-            <button class="btn ghost sm" @click="$emit('move', selPos.id, 0, 1)">↓</button>
-        </div>
-
         <button class="btn be-del" style="margin-top: 12px" @click="$emit('delete', selPos.id)">
             {{ lang === 'fr' ? 'Supprimer' : 'Delete' }}
         </button>
     </div>
 
     <div v-else-if="board.keys.length > 0" class="bs-select-hint">
-        {{ lang === 'fr' ? 'Cliquez une touche pour la modifier' : 'Click a key to edit it' }}
+        <div>{{ lang === 'fr' ? 'Cliquez une touche pour la modifier' : 'Click a key to edit it' }}</div>
+        <div class="bs-drag-hint">{{ lang === 'fr' ? 'Glissez pour déplacer · Coins pour tourner' : 'Drag to move · Corners to rotate' }}</div>
     </div>
 </div>
 </template>

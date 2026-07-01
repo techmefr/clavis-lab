@@ -77,13 +77,16 @@ const handName = computed(() => {
             <input v-model="name" class="txt" :placeholder="t.newLayoutName" autofocus />
             <div class="opts">
                 <div :class="['opt', layoutMode === 'blank' ? 'sel' : '']" @click="layoutMode = 'blank'">
-                    <span>◻</span> {{ t.blank }}
+                    <div class="opt-main"><span>◻</span> Cheapino V2</div>
+                    <div class="opt-sub">{{ lang === 'fr' ? 'Clavier existant, touches à configurer' : 'Existing keyboard, keys to configure' }}</div>
                 </div>
                 <div :class="['opt', layoutMode === 'dup' ? 'sel' : '']" @click="layoutMode = 'dup'">
-                    <span>⧉</span> {{ t.duplicate }}
+                    <div class="opt-main"><span>⧉</span> {{ t.duplicate }}</div>
+                    <div class="opt-sub">{{ lang === 'fr' ? 'Copie toutes les couches existantes' : 'Copies all existing layers' }}</div>
                 </div>
                 <div :class="['opt', layoutMode === 'whiteboard' ? 'sel' : '']" @click="layoutMode = 'whiteboard'">
-                    <span>⊞</span> {{ t.whiteboard }}
+                    <div class="opt-main"><span>⊞</span> {{ lang === 'fr' ? 'Clavier custom' : 'Custom keyboard' }}</div>
+                    <div class="opt-sub">{{ lang === 'fr' ? 'Construire votre propre clavier depuis zéro' : 'Build your own keyboard from scratch' }}</div>
                 </div>
             </div>
             <div class="row">

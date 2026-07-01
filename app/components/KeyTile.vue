@@ -48,6 +48,7 @@ const basePos = computed(() => ({
     class="key encoder"
     :class="selected ? 'selected' : ''"
     :style="basePos"
+    :data-key-id="pos.id"
     title="Encodeur"
     @click="$emit('click', pos.id)"
 >
@@ -63,6 +64,7 @@ const basePos = computed(() => ({
     class="key trackball"
     :class="selected ? 'selected' : ''"
     :style="{ ...basePos, width: keyW + 'px', height: keyW + 'px', '--fc': fingerVar(pos.finger) }"
+    :data-key-id="pos.id"
     @click="$emit('click', pos.id)"
 >
     <div class="tb-ring" />
@@ -88,6 +90,7 @@ const basePos = computed(() => ({
         transform: pos.rot ? `rotate(${pos.rot}deg)` : undefined,
         '--fc': fingerVar(pos.finger),
     }"
+    :data-key-id="pos.id"
     :data-type="keyDef ? keyDef.type : (base && base.type !== 'trans' ? base.type : 'trans')"
     @click="$emit('click', pos.id)"
 >
